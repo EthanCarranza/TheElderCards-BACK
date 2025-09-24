@@ -12,16 +12,13 @@ const {
   removeFromCollection,
   addToFavorites,
   removeFromFavorites,
-
-  mockCreateCard,
 } = require("../controllers/cardController");
 const router = express.Router();
 
 router.get("/", getCards);
 router.get("/all", getAllCards);
 router.get("/:id", getCardById);
-//router.post("/", isAuth, uploadCard.single("img"), createCard);
-router.post("/", isAuth, uploadCard.single("img"), mockCreateCard);
+router.post("/", isAuth, uploadCard.single("img"), createCard);
 //router.put("/:id", isAuth, uploadCard.single("img"), updateCard);
 router.delete("/:id", isAuth, deleteCard);
 

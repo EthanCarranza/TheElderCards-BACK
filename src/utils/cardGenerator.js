@@ -68,9 +68,11 @@ async function generateFramedImage(
   ctx.restore();
 
   // Imagen principal arriba
+  const inputIsRemote =
+    typeof inputImagePath === "string" && /^https?:\/\//.test(inputImagePath);
   let imageInput = inputImagePath;
   // Si es una URL remota, descargar como buffer
-  if (/^https?:\/\//.test(inputImagePath)) {
+  if (inputIsRemote) {
     const axios = require("axios");
     const response = await axios({
       url: inputImagePath,
@@ -204,27 +206,33 @@ async function generateFramedImage(
   stream.pipe(out);
   await new Promise((resolve) => out.on("finish", resolve));
 
-  /*
-  // Subir a Cloudinary usando la misma configuración que el resto del backend
+  // Subir a Cloudinary usando la misma configuracion que el resto del backend
   let cloudinaryUrl = null;
   try {
     const uploadResult = await cloudinary.uploader.upload(outputPath, {
       folder: "Cards",
-      allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],
       resource_type: "image",
     });
     cloudinaryUrl = uploadResult.secure_url;
   } catch (err) {
     console.error("Error subiendo a Cloudinary:", err);
     throw err;
+  } finally {
+    try {
+      if (!inputIsRemote && typeof inputImagePath === "string") {
+        await fs.promises.unlink(inputImagePath);
+      }
+    } catch (unlinkErr) {
+      console.warn("No se pudo eliminar la imagen de entrada:", unlinkErr);
+    }
+    try {
+      await fs.promises.unlink(outputPath);
+    } catch (unlinkErr) {
+      console.warn("No se pudo eliminar la imagen generada:", unlinkErr);
+    }
   }
 
-  // Eliminar archivos temporales
-  fs.unlinkSync(inputImagePath);
-  //fs.unlinkSync(outputPath);
-
   return cloudinaryUrl;
-  */
 }
 
 module.exports = {

@@ -66,26 +66,8 @@ const getAllCards = async (req, res, next) => {
 
 const createCard = async (req, res, next) => {
   try {
-    const card = new Card(req.body);
-    const factionExists = await Card.findById(card.faction);
-    if (!factionExists) {
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json("Facción no válida");
-    }
-    //lógica para crear carta
-    await card.save();
-    return res.status(HTTP_RESPONSES.CREATED).json(card);
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
-  }
-};
-
-const mockCreateCard = async (req, res, next) => {
-  try {
-    console.log("[mockCreateCard] req.body:", req.body);
-    console.log("[mockCreateCard] req.file:", req.file);
+    console.log("[createCard] req.body:", req.body);
+    console.log("[createCard] req.file:", req.file);
     const {
       title,
       date,
@@ -98,66 +80,120 @@ const mockCreateCard = async (req, res, next) => {
       defense,
     } = req.body;
 
-    // Comprobación de datos obligatorios
-    if (!title || !type || !faction) {
+    if (!title || !description || !type || !faction || !cost) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Faltan datos obligatorios");
+        .json({ message: "Faltan datos obligatorios" });
     }
 
-    // Comprobar que la facción existe y obtener su color
     const factionObj = await Faction.findById(faction);
     if (!factionObj) {
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json("Facción no válida");
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ message: "Faccion no valida" });
     }
     const frameColor = factionObj.color || "#cccccc";
 
-    // Depuración: si no hay archivo, devolver mensaje
-    if (!req.file) {
-      return res.status(400).json({
-        error: "No se recibió archivo de imagen",
-        body: req.body,
-        file: req.file,
-      });
+    if (!req.file || !req.file.path) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "No se recibio archivo de imagen" });
     }
 
-    console.log("[mockCreateCard] req.file.path:", req.file.path);
-    // Generar imagen de carta solo si hay archivo
-    let imgUrl = null;
-    if (req.file && req.file.path) {
-      imgUrl = await generateFramedImage(
-        req.file.path,
-        title,
-        type,
-        cost,
-        description,
-        frameColor,
-        type === "Creature" ? attack : undefined,
-        type === "Creature" ? defense : undefined
-      );
+    const parsedCost = Number(cost);
+    if (Number.isNaN(parsedCost)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Coste no valido" });
+    }
+    if (parsedCost < 0 || parsedCost > 10) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "El coste debe estar entre 0 y 10" });
     }
 
-    // Crear objeto carta
-    const cardData = {
-      title,
-      date,
-      description,
-      img: imgUrl,
-      creator,
-      type,
-      cost,
-      faction,
-    };
+    let parsedAttack;
+    let parsedDefense;
     if (type === "Creature") {
-      cardData.attack = attack;
-      cardData.defense = defense;
+      if (
+        attack === undefined ||
+        attack === null ||
+        attack === "" ||
+        defense === undefined ||
+        defense === null ||
+        defense === ""
+      ) {
+        return res
+          .status(HTTP_RESPONSES.BAD_REQUEST)
+          .json({ message: "Faltan valores de ataque o defensa" });
+      }
+      parsedAttack = Number(attack);
+      parsedDefense = Number(defense);
+      if (Number.isNaN(parsedAttack) || Number.isNaN(parsedDefense)) {
+        return res
+          .status(HTTP_RESPONSES.BAD_REQUEST)
+          .json({ message: "Ataque o defensa no validos" });
+      }
+      if (parsedAttack < 0 || parsedAttack > 10 || parsedDefense < 1 || parsedDefense > 10) {
+        return res
+          .status(HTTP_RESPONSES.BAD_REQUEST)
+          .json({ message: "Ataque debe estar entre 0 y 10 y defensa entre 1 y 10" });
+      }
     }
 
-    // const card = await new Card(cardData).save();
-    // return res.status(HTTP_RESPONSES.CREATED).json(card);
+    const imgUrl = await generateFramedImage(
+      req.file.path,
+      title,
+      type,
+      parsedCost,
+      description,
+      frameColor,
+      type === "Creature" ? parsedAttack : undefined,
+      type === "Creature" ? parsedDefense : undefined
+    );
 
-    // Si solo quieres devolver el objeto mock:
-    return res.status(HTTP_RESPONSES.CREATED).json(cardData);
+    if (!imgUrl) {
+      return res
+        .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
+        .json({ message: "No se pudo generar la imagen de la carta" });
+    }
+
+    const creatorName =
+      (req.user && (req.user.username || req.user.email)) ||
+      creator ||
+      "Anonimo";
+    const normalizedCreator =
+      typeof creatorName === "string"
+        ? creatorName.trim()
+        : String(creatorName);
+    const normalizedTitle =
+      typeof title === "string" ? title.trim() : String(title);
+    const normalizedDescription =
+      typeof description === "string"
+        ? description.trim()
+        : String(description);
+    let parsedDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(parsedDate.getTime())) {
+      parsedDate = new Date();
+    }
+
+    const cardData = {
+      title: normalizedTitle,
+      description: normalizedDescription,
+      type,
+      cost: parsedCost,
+      faction,
+      img: imgUrl,
+      creator: normalizedCreator,
+      date: parsedDate,
+    };
+
+    if (type === "Creature") {
+      cardData.attack = parsedAttack;
+      cardData.defense = parsedDefense;
+    }
+
+    const savedCard = await Card.create(cardData);
+    await savedCard.populate("faction");
+    return res.status(HTTP_RESPONSES.CREATED).json(savedCard);
   } catch (error) {
     console.log(error);
     return res
@@ -165,6 +201,8 @@ const mockCreateCard = async (req, res, next) => {
       .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
   }
 };
+
+const mockCreateCard = createCard;
 
 const getCardById = async (req, res, next) => {
   try {
