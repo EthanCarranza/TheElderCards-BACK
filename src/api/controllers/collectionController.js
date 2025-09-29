@@ -1,4 +1,4 @@
-const { HTTP_RESPONSES } = require("../models/httpResponses");
+const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Collection = require("../models/collection");
 const mongoose = require("mongoose");
 
@@ -12,8 +12,8 @@ const getCollections = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -35,8 +35,8 @@ const getCollectionById = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -56,8 +56,8 @@ const getCollectionByTitle = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -75,8 +75,8 @@ const createCollection = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -107,8 +107,8 @@ const addCardToCollection = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -141,8 +141,8 @@ const removeCardFromCollection = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -171,8 +171,8 @@ const deleteCollection = async (req, res, next) => {
   } catch (error) {
     console.error("Error al eliminar la colección:", error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 

@@ -1,4 +1,4 @@
-const { HTTP_RESPONSES } = require("../models/httpResponses");
+const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Faction = require("../models/faction");
 const mongoose = require("mongoose");
 
@@ -10,8 +10,8 @@ const createFaction = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -22,8 +22,8 @@ const getFactions = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -41,8 +41,8 @@ const getFactionById = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -60,8 +60,8 @@ const getFactionByName = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -81,8 +81,8 @@ const updateFaction = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -100,8 +100,8 @@ const deleteFaction = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 

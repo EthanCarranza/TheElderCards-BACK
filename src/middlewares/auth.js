@@ -1,6 +1,6 @@
 const User = require("../api/models/user");
 const { verificarLlave } = require("../utils/jwt");
-const { HTTP_RESPONSES } = require("../api/models/httpResponses");
+const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../api/models/httpResponses");
 
 const isAuth = async (req, res, next) => {
   try {
@@ -32,8 +32,8 @@ const isAuth = async (req, res, next) => {
         .json({ message: "Token inválido o expirado" });
     }
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json({ message: HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message });
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
   }
 };
 
@@ -72,8 +72,8 @@ const isAdmin = async (req, res, next) => {
         .json({ message: "Token inválido o expirado" });
     }
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json({ message: HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message });
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
   }
 };
 

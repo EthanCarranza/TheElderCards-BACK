@@ -1,4 +1,4 @@
-const { HTTP_RESPONSES } = require("../models/httpResponses");
+const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Card = require("../models/card");
 const User = require("../models/user");
 const Faction = require("../models/faction");
@@ -44,8 +44,8 @@ const getCards = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -59,8 +59,8 @@ const getAllCards = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -152,7 +152,7 @@ const createCard = async (req, res, next) => {
 
     if (!imgUrl) {
       return res
-        .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
+        .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
         .json({ message: "No se pudo generar la imagen de la carta" });
     }
 
@@ -197,8 +197,8 @@ const createCard = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -214,8 +214,8 @@ const getCardById = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -231,8 +231,8 @@ const updateCard = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -246,8 +246,8 @@ const deleteCard = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -275,8 +275,8 @@ const addToCollection = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -304,8 +304,8 @@ const removeFromCollection = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -325,8 +325,8 @@ const addToFavorites = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -344,8 +344,8 @@ const removeFromFavorites = async (req, res, next) => {
   } catch (error) {
     console.log(error);
     return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.code)
-      .json(HTTP_RESPONSES.INTERNAL_SERVER_ERROR.message);
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
