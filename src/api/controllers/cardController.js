@@ -13,7 +13,9 @@ const getCards = async (req, res, next) => {
     if (filters.type) query.type = filters.type;
     if (filters.faction) query.faction = filters.faction;
     if (filters.title) query.title = { $regex: filters.title, $options: "i" };
-    if (filters.creator) query.creator = filters.creator;
+    if (filters.creator) {
+      query.creator = { $regex: filters.creator, $options: "i" };
+    }
     if (filters.cost) query.cost = filters.cost;
     if (filters.type && filters.type === "Creature") {
       if (filters.attack) query.attack = filters.attack;
