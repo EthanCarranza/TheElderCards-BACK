@@ -4,7 +4,30 @@ const mongoose = require("mongoose");
 
 const createFaction = async (req, res, next) => {
   try {
-    const faction = new Faction(req.body);
+    const { title, description, territory, color } = req.body;
+
+    if (!title || !description || !territory || !color) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Faltan datos obligatorios" });
+    }
+
+    const factionData = {
+      title,
+      description,
+      territory,
+      color,
+    };
+
+    if (req.body && req.body.img) {
+      factionData.img = req.body.img;
+    }
+
+    if (req.file && req.file.path) {
+      factionData.img = req.file.path;
+    }
+
+    const faction = new Faction(factionData);
     const savedFaction = await faction.save();
     return res.status(HTTP_RESPONSES.CREATED).json(savedFaction);
   } catch (error) {
@@ -71,8 +94,22 @@ const updateFaction = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json("ID inválido");
     }
-    const updatedFaction = await Faction.findByIdAndUpdate(id, req.body, {
+
+    const updateData = { ...req.body };
+
+    if (req.file && req.file.path) {
+      updateData.img = req.file.path;
+    }
+
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key] === "" || updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
+
+    const updatedFaction = await Faction.findByIdAndUpdate(id, updateData, {
       new: true,
+      runValidators: true,
     });
     if (updatedFaction) {
       return res.status(HTTP_RESPONSES.OK).json(updatedFaction);
