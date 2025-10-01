@@ -11,6 +11,7 @@ const cloudinary = require("cloudinary").v2;
  * @param {string} type - Tipo de carta
  * @param {string} description - Descripción
  * @param {string} frameColor - Color del marco (ej: '#ff0000')
+ * @param {string} creator - Nombre del creador que se mostrara en la carta.
  * @param {number} [attack] - Valor de ataque (solo si type es 'Creature')
  * @param {number} [defense] - Valor de defensa (solo si type es 'Creature')
  * @returns {Promise<string>} Ruta del archivo de salida
@@ -22,6 +23,7 @@ async function generateFramedImage(
   cost,
   description,
   frameColor,
+  creator,
   attack,
   defense
 ) {
@@ -32,8 +34,16 @@ async function generateFramedImage(
   const cutSize = 48;
   const imageHeight = Math.floor(canvasHeight / 2); // Ocupa la mitad de la carta
   const titleBarHeight = 56;
-  const descHeight = 180;
-  const descY = imageHeight + titleBarHeight;
+  const typeBarHeight = 32;
+  const footerHeight = 68;
+  const descY = imageHeight + titleBarHeight + typeBarHeight;
+  const availableDescHeight = Math.max(canvasHeight - footerHeight - border - descY, 0);
+  const descHeight = Math.min(availableDescHeight, 180);
+  const footerY = canvasHeight - border - footerHeight;
+  const normalizedCreator =
+    typeof creator === "string" && creator.trim().length > 0
+      ? creator.trim()
+      : "Anonimo";
 
   // Crear canvas
   const canvas = createCanvas(canvasWidth, canvasHeight);
@@ -127,76 +137,114 @@ async function generateFramedImage(
   ctx.fillText(String(cost), costX, costY);
   ctx.restore();
 
-  // Franja título-tipo
+  // Franja del titulo
   ctx.save();
-  ctx.fillStyle = "#e0e0e0";
+  ctx.fillStyle = "#c6c6c6";
   ctx.fillRect(border, imageHeight, canvasWidth - 2 * border, titleBarHeight);
   ctx.fillStyle = "#222";
   ctx.font = "bold 24px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(
-    `${title} - ${type}`,
-    canvasWidth / 2,
-    imageHeight + titleBarHeight / 2
-  );
+  ctx.fillText(title, canvasWidth / 2, imageHeight + titleBarHeight / 2);
   ctx.restore();
 
-  // Descripción
+  // Franja del tipo
   ctx.save();
-  ctx.fillStyle = "#f0f0f0";
-  ctx.fillRect(border, descY, canvasWidth - 2 * border, descHeight);
+  ctx.fillStyle = "#dadada";
+  ctx.fillRect(
+    border,
+    imageHeight + titleBarHeight,
+    canvasWidth - 2 * border,
+    typeBarHeight
+  );
   ctx.fillStyle = "#333";
-  ctx.font = "18px sans-serif";
+  ctx.font = "600 18px sans-serif";
   ctx.textAlign = "center";
-  ctx.textBaseline = "top";
+  ctx.textBaseline = "middle";
+  ctx.fillText(type, canvasWidth / 2, imageHeight + titleBarHeight + typeBarHeight / 2);
+  ctx.restore();
+  if (descHeight > 0) {
+    ctx.save();
+    ctx.fillStyle = "#f0f0f0";
+    ctx.fillRect(border, descY, canvasWidth - 2 * border, descHeight);
+    ctx.fillStyle = "#333";
+    ctx.font = "18px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
 
-  // Ajustar texto multilinea centrado
-  const words = description.split(" ");
-  let line = "";
-  let y = descY + 16;
-  const lineHeight = 24;
-  const descBoxWidth = canvasWidth - 2 * border - 24;
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + " ";
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > descBoxWidth && n > 0) {
-      ctx.fillText(line.trim(), canvasWidth / 2, y);
-      line = words[n] + " ";
-      y += lineHeight;
-    } else {
-      line = testLine;
+    const words = description.split(" ");
+    let line = "";
+    let y = descY + 16;
+    const lineHeight = 24;
+    const descBoxWidth = canvasWidth - 2 * border - 24;
+    const maxLines = Math.max(Math.floor(descHeight / lineHeight), 1);
+    let linesDrawn = 0;
+
+    for (let n = 0; n < words.length; n++) {
+      const testLine = line + words[n] + " ";
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > descBoxWidth && n > 0) {
+        ctx.fillText(line.trim(), canvasWidth / 2, y);
+        linesDrawn += 1;
+        if (linesDrawn >= maxLines) {
+          line = "";
+          break;
+        }
+        line = words[n] + " ";
+        y += lineHeight;
+      } else {
+        line = testLine;
+      }
     }
+    if (line.trim().length > 0 && linesDrawn < maxLines) {
+      ctx.fillText(line.trim(), canvasWidth / 2, y);
+    }
+    ctx.restore();
   }
-  ctx.fillText(line.trim(), canvasWidth / 2, y);
+  // Pie con nombre del creador
+  ctx.save();
+  const footerLabelFont = 14;
+  const footerNameFont = 18;
+  const footerGap = 6;
+  const footerPaddingBottom = 12;
+  const footerBaseline = footerY + footerHeight - footerPaddingBottom;
+  const footerLabel = "Created by:";
+  const footerName = normalizedCreator;
+  const footerLabelFontStr = '400 ' + footerLabelFont + 'px sans-serif';
+  const footerNameFontStr = '600 ' + footerNameFont + 'px sans-serif';
+  ctx.fillStyle = "#222";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = footerLabelFontStr;
+  const labelWidth = ctx.measureText(footerLabel).width;
+  ctx.font = footerNameFontStr;
+  const nameWidth = ctx.measureText(footerName).width;
+  const totalWidth = labelWidth + footerGap + nameWidth;
+  const footerStartX = (canvasWidth - totalWidth) / 2;
+  ctx.font = footerLabelFontStr;
+  ctx.fillText(footerLabel, footerStartX, footerBaseline);
+  ctx.font = footerNameFontStr;
+  ctx.fillText(footerName, footerStartX + labelWidth + footerGap, footerBaseline);
   ctx.restore();
 
   // Ataque/defensa si es Creature
   if (type === "Creature" && attack !== undefined && defense !== undefined) {
-    const rectW = 80,
-      rectH = 38;
+    const rectW = 80;
+    const rectH = 38;
+    const rectX = canvasWidth - border - rectW;
+    const rectY = canvasHeight - border - rectH;
     ctx.save();
     ctx.fillStyle = "#222";
     ctx.globalAlpha = 0.85;
-    ctx.fillRect(
-      canvasWidth - border - rectW,
-      canvasHeight - border - rectH,
-      rectW,
-      rectH
-    );
+    ctx.fillRect(rectX, rectY, rectW, rectH);
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#fff";
     ctx.font = "bold 20px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(
-      `${attack} / ${defense}`,
-      canvasWidth - border - rectW / 2,
-      canvasHeight - border - rectH / 2
-    );
+    ctx.fillText(`${attack} / ${defense}`, rectX + rectW / 2, rectY + rectH / 2);
     ctx.restore();
   }
-
   // Guardar imagen temporalmente
   const outputDir = path.join("output");
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);

@@ -141,6 +141,14 @@ const createCard = async (req, res, next) => {
       }
     }
 
+    const creatorName =
+      (req.user && (req.user.username || req.user.email)) ||
+      creator ||
+      "Anonimo";
+    const normalizedCreator =
+      typeof creatorName === "string" && creatorName.trim().length > 0
+        ? creatorName.trim()
+        : String(creatorName || "Anonimo");
     const imgUrl = await generateFramedImage(
       req.file.path,
       title,
@@ -148,6 +156,7 @@ const createCard = async (req, res, next) => {
       parsedCost,
       description,
       frameColor,
+      normalizedCreator,
       type === "Creature" ? parsedAttack : undefined,
       type === "Creature" ? parsedDefense : undefined
     );
@@ -158,14 +167,6 @@ const createCard = async (req, res, next) => {
         .json({ message: "No se pudo generar la imagen de la carta" });
     }
 
-    const creatorName =
-      (req.user && (req.user.username || req.user.email)) ||
-      creator ||
-      "Anonimo";
-    const normalizedCreator =
-      typeof creatorName === "string"
-        ? creatorName.trim()
-        : String(creatorName);
     const normalizedTitle =
       typeof title === "string" ? title.trim() : String(title);
     const normalizedDescription =
