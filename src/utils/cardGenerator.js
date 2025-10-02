@@ -1,8 +1,40 @@
 const sharp = require("sharp");
-const { createCanvas, loadImage } = require("canvas");
+const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 const fs = require("fs");
 const path = require("path");
 const cloudinary = require("cloudinary").v2;
+
+const FONT_FAMILY = "Cyrodiil";
+const FONT_FILES = [
+  "Cyrodiil.otf",
+  "Cyrodiil-Bold.otf",
+];
+
+let fontRegistered = false;
+const missingFontFiles = [];
+
+for (const fontFile of FONT_FILES) {
+  const fontPath = path.join(__dirname, "..", "..", "fonts", fontFile);
+  if (!fs.existsSync(fontPath)) {
+    missingFontFiles.push(fontPath);
+    continue;
+  }
+
+  const registered = GlobalFonts.registerFromPath(fontPath, FONT_FAMILY);
+  if (registered) {
+    fontRegistered = true;
+  } else {
+    console.warn(`GlobalFonts failed to register Cyrodiil font at ${fontPath}`);
+  }
+}
+
+if (missingFontFiles.length) {
+  console.warn(`Cyrodiil font files not found at: ${missingFontFiles.join(', ')}`);
+}
+
+if (!fontRegistered) {
+  console.warn("Unable to register any Cyrodiil font variant.");
+}
 
 /**
  * Genera una carta vertical con marco de color, esquinas recortadas, imagen arriba, título-tipo, descripción y ataque/defensa si corresponde.
@@ -135,7 +167,7 @@ async function generateFramedImage(
   ctx.globalAlpha = 0.85;
   ctx.fill();
   ctx.globalAlpha = 1;
-  ctx.font = "bold 28px sans-serif";
+  ctx.font = `bold 28px "${FONT_FAMILY}"`;
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -147,7 +179,7 @@ async function generateFramedImage(
   ctx.fillStyle = "#c6c6c6";
   ctx.fillRect(border, imageHeight, canvasWidth - 2 * border, titleBarHeight);
   ctx.fillStyle = "#222";
-  ctx.font = "bold 24px sans-serif";
+  ctx.font = `bold 24px "${FONT_FAMILY}"`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(title, canvasWidth / 2, imageHeight + titleBarHeight / 2);
@@ -163,7 +195,7 @@ async function generateFramedImage(
     typeBarHeight
   );
   ctx.fillStyle = "#333";
-  ctx.font = "600 18px sans-serif";
+  ctx.font = `600 18px "${FONT_FAMILY}"`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(
@@ -177,7 +209,7 @@ async function generateFramedImage(
     ctx.fillStyle = "#f0f0f0";
     ctx.fillRect(border, descY, canvasWidth - 2 * border, descHeight);
     ctx.fillStyle = "#333";
-    ctx.font = "18px sans-serif";
+    ctx.font = `18px "${FONT_FAMILY}"`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
 
@@ -263,8 +295,8 @@ async function generateFramedImage(
   const footerBaseline = footerY + footerHeight - footerPaddingBottom;
   const footerLabel = "Created by:";
   const footerName = normalizedCreator;
-  const footerLabelFontStr = "400 " + footerLabelFont + "px sans-serif";
-  const footerNameFontStr = "600 " + footerNameFont + "px sans-serif";
+  const footerLabelFontStr = `400 ${footerLabelFont}px "${FONT_FAMILY}"`;
+  const footerNameFontStr = `600 ${footerNameFont}px "${FONT_FAMILY}"`;
   ctx.fillStyle = "#222";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
@@ -296,7 +328,7 @@ async function generateFramedImage(
     ctx.fillRect(rectX, rectY, rectW, rectH);
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 20px sans-serif";
+    ctx.font = `bold 20px "${FONT_FAMILY}"`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(
@@ -310,10 +342,8 @@ async function generateFramedImage(
   const outputDir = path.join("output");
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
   const outputPath = path.join(outputDir, `${Date.now()}.png`);
-  const out = fs.createWriteStream(outputPath);
-  const stream = canvas.createPNGStream();
-  stream.pipe(out);
-  await new Promise((resolve) => out.on("finish", resolve));
+  const pngBuffer = await canvas.encode("png");
+  await fs.promises.writeFile(outputPath, pngBuffer);
 
   // Subir a Cloudinary usando la misma configuracion que el resto del backend
   let cloudinaryUrl = null;
