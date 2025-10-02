@@ -13,7 +13,7 @@ const usersRouter = require("express").Router();
 const { uploadProfile } = require("../../middlewares/fileStorage");
 
 usersRouter.get("/", getUsers);
-usersRouter.get("/:id", getUserById);
+usersRouter.get("/:id", isAuth, getUserById);
 usersRouter.post("/register", register);
 usersRouter.post("/login", login);
 usersRouter.put("/:id", isAuth, updateUser);
