@@ -37,13 +37,18 @@ async function generateFramedImage(
   const typeBarHeight = 32;
   const footerHeight = 68;
   const descY = imageHeight + titleBarHeight + typeBarHeight;
-  const availableDescHeight = Math.max(canvasHeight - footerHeight - border - descY, 0);
-  const descHeight = Math.min(availableDescHeight, 180);
+  const defenseHeight = 38; // Altura del recuadro de ataque/defensa
+  const defenseMargin = 8; // Margen adicional para separación
+  const availableDescHeight = Math.max(
+    canvasHeight - border - descY - defenseHeight - defenseMargin,
+    0
+  );
+  const descHeight = availableDescHeight; // Usar todo el espacio disponible
   const footerY = canvasHeight - border - footerHeight;
   const normalizedCreator =
-    typeof creator === "string" && creator.trim().length > 0
+    creator && creator !== "undefined" && creator.trim().length > 0
       ? creator.trim()
-      : "Anonimo";
+      : "Anónimo";
 
   // Crear canvas
   const canvas = createCanvas(canvasWidth, canvasHeight);
@@ -161,7 +166,11 @@ async function generateFramedImage(
   ctx.font = "600 18px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(type, canvasWidth / 2, imageHeight + titleBarHeight + typeBarHeight / 2);
+  ctx.fillText(
+    type,
+    canvasWidth / 2,
+    imageHeight + titleBarHeight + typeBarHeight / 2
+  );
   ctx.restore();
   if (descHeight > 0) {
     ctx.save();
@@ -172,46 +181,90 @@ async function generateFramedImage(
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
 
-    const words = description.split(" ");
-    let line = "";
-    let y = descY + 16;
-    const lineHeight = 24;
-    const descBoxWidth = canvasWidth - 2 * border - 24;
-    const maxLines = Math.max(Math.floor(descHeight / lineHeight), 1);
-    let linesDrawn = 0;
+    const lineHeight = 22;
+    const descBoxWidth = canvasWidth - 2 * border - 32;
+    const maxLines = Math.floor(descHeight / lineHeight);
+    const lines = [];
 
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + " ";
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > descBoxWidth && n > 0) {
-        ctx.fillText(line.trim(), canvasWidth / 2, y);
-        linesDrawn += 1;
-        if (linesDrawn >= maxLines) {
-          line = "";
-          break;
+    const words = description.split(" ");
+    let currentLine = "";
+
+    for (const word of words) {
+      // Si la palabra es más larga que el ancho disponible, cortarla
+      if (ctx.measureText(word).width > descBoxWidth) {
+        // Si hay una línea actual, añadirla primero
+        if (currentLine) {
+          lines.push(currentLine);
+          if (lines.length >= maxLines) break;
+          currentLine = "";
         }
-        line = words[n] + " ";
-        y += lineHeight;
+
+        // Cortar la palabra larga en pedazos
+        let remainingWord = word;
+        while (remainingWord && lines.length < maxLines) {
+          let i = remainingWord.length;
+          let chunk = remainingWord;
+
+          // Reducir el tamaño del chunk hasta que quepa
+          while (ctx.measureText(chunk).width > descBoxWidth && i > 0) {
+            i--;
+            chunk = remainingWord.substring(0, i);
+          }
+
+          if (i > 0) {
+            lines.push(chunk);
+            remainingWord = remainingWord.substring(i);
+          } else {
+            // Si ni siquiera un carácter cabe, forzar al menos uno
+            lines.push(remainingWord[0]);
+            remainingWord = remainingWord.substring(1);
+          }
+        }
       } else {
-        line = testLine;
+        const testLine = currentLine + (currentLine ? " " : "") + word;
+        const metrics = ctx.measureText(testLine);
+
+        if (metrics.width <= descBoxWidth) {
+          currentLine = testLine;
+        } else {
+          if (currentLine) {
+            lines.push(currentLine);
+            if (lines.length >= maxLines) break;
+          }
+          currentLine = word;
+        }
       }
     }
-    if (line.trim().length > 0 && linesDrawn < maxLines) {
-      ctx.fillText(line.trim(), canvasWidth / 2, y);
+
+    if (currentLine && lines.length < maxLines) {
+      lines.push(currentLine);
     }
+
+    // Dibujar las líneas centradas verticalmente
+    const totalLines = Math.min(lines.length, maxLines);
+    const totalTextHeight = totalLines * lineHeight;
+    const fixedPadding = 16; // Padding fijo arriba y abajo
+    const availableHeight = descHeight - fixedPadding * 2;
+    const extraSpace = Math.max(availableHeight - totalTextHeight, 0);
+    const startY = descY + fixedPadding + extraSpace / 2;
+
+    lines.slice(0, maxLines).forEach((line, index) => {
+      const y = startY + index * lineHeight;
+      ctx.fillText(line, canvasWidth / 2, y);
+    });
     ctx.restore();
   }
   // Pie con nombre del creador
   ctx.save();
-  const footerLabelFont = 14;
-  const footerNameFont = 18;
-  const footerGap = 6;
+  const footerLabelFont = 12;
+  const footerNameFont = 14;
+  const footerGap = 4;
   const footerPaddingBottom = 12;
   const footerBaseline = footerY + footerHeight - footerPaddingBottom;
   const footerLabel = "Created by:";
   const footerName = normalizedCreator;
-  const footerLabelFontStr = '400 ' + footerLabelFont + 'px sans-serif';
-  const footerNameFontStr = '600 ' + footerNameFont + 'px sans-serif';
+  const footerLabelFontStr = "400 " + footerLabelFont + "px sans-serif";
+  const footerNameFontStr = "600 " + footerNameFont + "px sans-serif";
   ctx.fillStyle = "#222";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
@@ -224,7 +277,11 @@ async function generateFramedImage(
   ctx.font = footerLabelFontStr;
   ctx.fillText(footerLabel, footerStartX, footerBaseline);
   ctx.font = footerNameFontStr;
-  ctx.fillText(footerName, footerStartX + labelWidth + footerGap, footerBaseline);
+  ctx.fillText(
+    footerName,
+    footerStartX + labelWidth + footerGap,
+    footerBaseline
+  );
   ctx.restore();
 
   // Ataque/defensa si es Creature
@@ -242,7 +299,11 @@ async function generateFramedImage(
     ctx.font = "bold 20px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${attack} / ${defense}`, rectX + rectW / 2, rectY + rectH / 2);
+    ctx.fillText(
+      `${attack} / ${defense}`,
+      rectX + rectW / 2,
+      rectY + rectH / 2
+    );
     ctx.restore();
   }
   // Guardar imagen temporalmente

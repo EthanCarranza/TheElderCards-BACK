@@ -90,7 +90,9 @@ const createCard = async (req, res, next) => {
 
     const factionObj = await Faction.findById(faction);
     if (!factionObj) {
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ message: "Faccion no valida" });
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Faccion no valida" });
     }
     const frameColor = factionObj.color || "#cccccc";
 
@@ -134,10 +136,17 @@ const createCard = async (req, res, next) => {
           .status(HTTP_RESPONSES.BAD_REQUEST)
           .json({ message: "Ataque o defensa no validos" });
       }
-      if (parsedAttack < 0 || parsedAttack > 10 || parsedDefense < 1 || parsedDefense > 10) {
+      if (
+        parsedAttack < 0 ||
+        parsedAttack > 10 ||
+        parsedDefense < 1 ||
+        parsedDefense > 10
+      ) {
         return res
           .status(HTTP_RESPONSES.BAD_REQUEST)
-          .json({ message: "Ataque debe estar entre 0 y 10 y defensa entre 1 y 10" });
+          .json({
+            message: "Ataque debe estar entre 0 y 10 y defensa entre 1 y 10",
+          });
       }
     }
 
