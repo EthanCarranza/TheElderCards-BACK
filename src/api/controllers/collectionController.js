@@ -1,5 +1,6 @@
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Collection = require("../models/collection");
+const User = require("../models/user");
 const mongoose = require("mongoose");
 
 const getCollections = async (req, res, next) => {
@@ -63,12 +64,25 @@ const getCollectionByTitle = async (req, res, next) => {
 
 const createCollection = async (req, res, next) => {
   try {
+    if (!req.user) {
+      return res
+        .status(HTTP_RESPONSES.UNAUTHORIZED)
+        .json({ message: "Token no proporcionado, acceso no autorizado" });
+    }
+
+    const title = (req.body.title || "").trim();
+    if (!title) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Titulo faltante" });
+    }
+
     const newCollection = new Collection({
-      title: req.body.title,
-      description: req.body.description,
+      title,
+      description: req.body.description || "",
       img: req.file ? req.file.path : null,
-      creator: req.body.creator,
-      cards: req.body.cards || [],
+      creator: req.user._id.toString(),
+      cards: Array.isArray(req.body.cards) ? req.body.cards : [],
     });
     const collection = await newCollection.save();
     return res.status(HTTP_RESPONSES.CREATED).json(collection);
@@ -146,6 +160,75 @@ const removeCardFromCollection = async (req, res, next) => {
   }
 };
 
+// Secure wrappers enforcing ownership
+const addCardToCollectionSecure = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { cardId } = req.body;
+    if (!id || !cardId) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json("Id de colecci��n o carta faltante");
+    }
+    const collection = await Collection.findById(id);
+    if (!collection) {
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json("Colecci��n no encontrada");
+    }
+    if (!req.user || collection.creator.toString() !== req.user._id.toString()) {
+      return res
+        .status(HTTP_RESPONSES.FORBIDDEN)
+        .json("No tienes permiso para modificar esta colecci��n");
+    }
+    if (!collection.cards.map((c) => c.toString()).includes(cardId)) {
+      collection.cards.push(cardId);
+      await collection.save();
+    }
+    return res.status(HTTP_RESPONSES.OK).json(collection);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const removeCardFromCollectionSecure = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { cardId } = req.body;
+    if (!id || !cardId) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json("Id de colecci��n o carta faltante");
+    }
+    const collection = await Collection.findById(id);
+    if (!collection) {
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json("Colecci��n no encontrada");
+    }
+    if (!req.user || collection.creator.toString() !== req.user._id.toString()) {
+      return res
+        .status(HTTP_RESPONSES.FORBIDDEN)
+        .json("No tienes permiso para modificar esta colecci��n");
+    }
+    if (collection.cards.map((c) => c.toString()).includes(cardId)) {
+      collection.cards = collection.cards.filter(
+        (c) => c.toString() !== cardId
+      );
+      await collection.save();
+    }
+    return res.status(HTTP_RESPONSES.OK).json(collection);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
 const deleteCollection = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -182,6 +265,125 @@ module.exports = {
   getCollectionByTitle,
   createCollection,
   deleteCollection,
-  addCardToCollection,
-  removeCardFromCollection,
+  addCardToCollection: addCardToCollectionSecure,
+  removeCardFromCollection: removeCardFromCollectionSecure,
 };
+
+// Additional handlers and export mappings
+const getCollectionsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de usuario invalido" });
+    }
+    const collections = await Collection.find({ creator: userId }).populate("cards");
+    return res.status(HTTP_RESPONSES.OK).json(collections || []);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const getMyCollections = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res
+        .status(HTTP_RESPONSES.UNAUTHORIZED)
+        .json({ message: "Token no proporcionado, acceso no autorizado" });
+    }
+    const collections = await Collection.find({ creator: req.user._id.toString() }).populate("cards");
+    return res.status(HTTP_RESPONSES.OK).json(collections || []);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const addFavoriteCollection = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res
+        .status(HTTP_RESPONSES.UNAUTHORIZED)
+        .json({ message: "Token no proporcionado, acceso no autorizado" });
+    }
+    const { id } = req.params; // collection id
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de coleccion invalido" });
+    }
+    const exists = await Collection.findById(id);
+    if (!exists) {
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Colecci��n no encontrada" });
+    }
+    const user = await User.findById(req.user._id);
+    if (!user.favoriteCollections.map((c) => c.toString()).includes(id)) {
+      user.favoriteCollections.push(id);
+      await user.save();
+    }
+    return res.status(HTTP_RESPONSES.OK).json(user.favoriteCollections);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const removeFavoriteCollection = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res
+        .status(HTTP_RESPONSES.UNAUTHORIZED)
+        .json({ message: "Token no proporcionado, acceso no autorizado" });
+    }
+    const { id } = req.params; // collection id
+    const user = await User.findById(req.user._id);
+    user.favoriteCollections = user.favoriteCollections.filter(
+      (c) => c.toString() !== id
+    );
+    await user.save();
+    return res.status(HTTP_RESPONSES.OK).json(user.favoriteCollections);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const getFavoriteCollections = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res
+        .status(HTTP_RESPONSES.UNAUTHORIZED)
+        .json({ message: "Token no proporcionado, acceso no autorizado" });
+    }
+    const user = await User.findById(req.user._id).populate({
+      path: "favoriteCollections",
+      populate: { path: "cards" },
+    });
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json(user?.favoriteCollections || []);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+module.exports.getCollectionsByUser = getCollectionsByUser;
+module.exports.getMyCollections = getMyCollections;
+module.exports.addFavoriteCollection = addFavoriteCollection;
+module.exports.removeFavoriteCollection = removeFavoriteCollection;
+module.exports.getFavoriteCollections = getFavoriteCollections;
