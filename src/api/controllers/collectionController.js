@@ -181,11 +181,19 @@ const addCardToCollectionSecure = async (req, res, next) => {
         .status(HTTP_RESPONSES.FORBIDDEN)
         .json("No tienes permiso para modificar esta colecci��n");
     }
-    if (!collection.cards.map((c) => c.toString()).includes(cardId)) {
-      collection.cards.push(cardId);
-      await collection.save();
+    const alreadyIn = collection.cards.map((c) => c.toString()).includes(cardId);
+    if (alreadyIn) {
+      return res
+        .status(HTTP_RESPONSES.CONFLICT || 409)
+        .json({ message: "La carta ya está en la colección" });
     }
-    return res.status(HTTP_RESPONSES.OK).json(collection);
+    collection.cards.push(cardId);
+    await collection.save();
+    const payload =
+      typeof collection.toObject === "function" ? collection.toObject() : collection;
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json({ ...payload, _meta: { added: true } });
   } catch (error) {
     console.log(error);
     return res
@@ -214,13 +222,20 @@ const removeCardFromCollectionSecure = async (req, res, next) => {
         .status(HTTP_RESPONSES.FORBIDDEN)
         .json("No tienes permiso para modificar esta colecci��n");
     }
-    if (collection.cards.map((c) => c.toString()).includes(cardId)) {
+    const wasIn = collection.cards.map((c) => c.toString()).includes(cardId);
+    let removed = false;
+    if (wasIn) {
       collection.cards = collection.cards.filter(
         (c) => c.toString() !== cardId
       );
       await collection.save();
+      removed = true;
     }
-    return res.status(HTTP_RESPONSES.OK).json(collection);
+    const payload =
+      typeof collection.toObject === "function" ? collection.toObject() : collection;
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json({ ...payload, _meta: { removed } });
   } catch (error) {
     console.log(error);
     return res
