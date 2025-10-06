@@ -129,11 +129,29 @@ const deleteFaction = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json("ID inválido");
     }
-    const deletedFaction = await Faction.findByIdAndDelete(id);
-    if (deletedFaction) {
-      return res.status(HTTP_RESPONSES.OK).json("Facción eliminada");
+
+    // Verificar si la facción existe
+    const faction = await Faction.findById(id);
+    if (!faction) {
+      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Facción no encontrada");
     }
-    return res.status(HTTP_RESPONSES.NOT_FOUND).json("Facción no encontrada");
+
+    // Verificar si hay cartas que usan esta facción
+    const Card = require("../models/card");
+    const cardsUsingFaction = await Card.countDocuments({ faction: id });
+
+    if (cardsUsingFaction > 0) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: `No se puede eliminar la facción. Hay ${cardsUsingFaction} carta(s) que la usan.`,
+        cardsCount: cardsUsingFaction,
+      });
+    }
+
+    // Si no hay cartas que la usen, eliminar la facción
+    await Faction.findByIdAndDelete(id);
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json({ message: "Facción eliminada correctamente" });
   } catch (error) {
     console.log(error);
     return res

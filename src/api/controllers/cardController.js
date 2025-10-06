@@ -142,11 +142,9 @@ const createCard = async (req, res, next) => {
         parsedDefense < 1 ||
         parsedDefense > 10
       ) {
-        return res
-          .status(HTTP_RESPONSES.BAD_REQUEST)
-          .json({
-            message: "Ataque debe estar entre 0 y 10 y defensa entre 1 y 10",
-          });
+        return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+          message: "Ataque debe estar entre 0 y 10 y defensa entre 1 y 10",
+        });
       }
     }
 
@@ -250,11 +248,28 @@ const updateCard = async (req, res, next) => {
 
 const deleteCard = async (req, res, next) => {
   try {
-    const card = await Card.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    const card = await Card.findById(id);
+
     if (!card) {
       return res.status(HTTP_RESPONSES.NOT_FOUND).json("Carta no encontrada");
     }
-    return res.status(HTTP_RESPONSES.OK).json({ message: "Carta eliminada" });
+
+    // Verificar permisos: el creador puede eliminar su carta, o admin puede eliminar cualquiera
+    const userCreator = req.user?.username || req.user?.email || "Anonimo";
+    const isAdmin = req.user?.role === "admin";
+    const isOwner = card.creator.toLowerCase() === userCreator.toLowerCase();
+
+    if (!isAdmin && !isOwner) {
+      return res
+        .status(HTTP_RESPONSES.FORBIDDEN)
+        .json({ message: "No tienes permiso para eliminar esta carta" });
+    }
+
+    await Card.findByIdAndDelete(id);
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json({ message: "Carta eliminada correctamente" });
   } catch (error) {
     console.log(error);
     return res
@@ -279,7 +294,9 @@ const addToCollection = async (req, res, next) => {
         .status(HTTP_RESPONSES.FORBIDDEN || 403)
         .json("No tienes permiso para modificar esta colección");
     }
-    const alreadyIn = collection.cards.map((id) => id.toString()).includes(cardId);
+    const alreadyIn = collection.cards
+      .map((id) => id.toString())
+      .includes(cardId);
     if (alreadyIn) {
       return res
         .status(HTTP_RESPONSES.CONFLICT || 409)
@@ -287,7 +304,9 @@ const addToCollection = async (req, res, next) => {
     }
     collection.cards.push(cardId);
     await collection.save();
-    return res.status(HTTP_RESPONSES.OK).json({ cards: collection.cards, added: true });
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json({ cards: collection.cards, added: true });
   } catch (error) {
     console.log(error);
     return res
@@ -321,7 +340,9 @@ const removeFromCollection = async (req, res, next) => {
       await collection.save();
       removed = true;
     }
-    return res.status(HTTP_RESPONSES.OK).json({ cards: collection.cards, removed });
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json({ cards: collection.cards, removed });
   } catch (error) {
     console.log(error);
     return res
