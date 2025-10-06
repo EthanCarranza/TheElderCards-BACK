@@ -5,6 +5,7 @@ const usersRouter = require("./src/api/routes/userRoute");
 const cardsRouter = require("./src/api/routes/cardRoute");
 const collectionRouter = require("./src/api/routes/collectionRoute");
 const factionsRouter = require("./src/api/routes/factionRoute");
+const cardInteractionRouter = require("./src/api/routes/cardInteractionRoute");
 
 const cloudinary = require("cloudinary").v2;
 const cors = require("cors");
@@ -25,6 +26,7 @@ app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/cards", cardsRouter);
 app.use("/api/v1/collections", collectionRouter);
 app.use("/api/v1/factions", factionsRouter);
+app.use("/api/v1/card-interactions", cardInteractionRouter);
 
 app.use("*", (req, res, next) => {
   return res.status(404).json("Route Not Found");

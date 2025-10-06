@@ -3,13 +3,16 @@ const Card = require("../models/card");
 const User = require("../models/user");
 const Faction = require("../models/faction");
 const Collection = require("../models/collection");
+const CardInteraction = require("../models/cardInteraction");
 const { generateFramedImage } = require("../../utils/cardGenerator");
 
 const getCards = async (req, res, next) => {
   try {
     console.log("Fetching cards with filters:", req.query);
-    const { page = 1, limit = 20, sort, ...filters } = req.query;
+    const { page = 1, limit = 20, sort, user: userId, favorites, liked, mostLiked, ...filters } = req.query;
     const query = {};
+    
+    // Filtros básicos
     if (filters.type) query.type = filters.type;
     if (filters.faction) query.faction = filters.faction;
     if (filters.title) query.title = { $regex: filters.title, $options: "i" };
@@ -22,10 +25,81 @@ const getCards = async (req, res, next) => {
       if (filters.defense) query.defense = filters.defense;
     }
 
+    // Manejo de filtros especiales por interacciones
+    let cardIds = null;
+    
+    if (favorites === "true" && userId) {
+      const favoriteInteractions = await CardInteraction.find({
+        userId,
+        favorited: true
+      }).select("cardId");
+      cardIds = favoriteInteractions.map(interaction => interaction.cardId);
+    }
+    
+    if (liked === "true" && userId) {
+      const likedInteractions = await CardInteraction.find({
+        userId,
+        liked: true
+      }).select("cardId");
+      const likedIds = likedInteractions.map(interaction => interaction.cardId);
+      
+      if (cardIds) {
+        // Intersección si ya hay filtro de favoritos
+        cardIds = cardIds.filter(id => likedIds.some(likedId => likedId.toString() === id.toString()));
+      } else {
+        cardIds = likedIds;
+      }
+    }
+
+    if (cardIds !== null) {
+      query._id = { $in: cardIds };
+    }
+
     let sortObj = {};
     if (sort) {
-      const [field, direction] = sort.split("_");
-      sortObj[field] = direction === "desc" ? -1 : 1;
+      if (sort === "most_liked") {
+        // Para ordenar por más likes, necesitamos una agregación
+        const pipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: "cardinteractions",
+              localField: "_id",
+              foreignField: "cardId",
+              as: "interactions"
+            }
+          },
+          {
+            $addFields: {
+              likesCount: {
+                $size: {
+                  $filter: {
+                    input: "$interactions",
+                    cond: { $eq: ["$$this.liked", true] }
+                  }
+                }
+              }
+            }
+          },
+          { $sort: { likesCount: -1 } },
+          { $skip: (parseInt(page) - 1) * parseInt(limit) },
+          { $limit: parseInt(limit) }
+        ];
+
+        const cards = await Card.aggregate(pipeline);
+        const total = await Card.countDocuments(query);
+
+        return res.status(HTTP_RESPONSES.OK).json({
+          cards,
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / parseInt(limit)),
+        });
+      } else {
+        const [field, direction] = sort.split("_");
+        sortObj[field] = direction === "desc" ? -1 : 1;
+      }
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
