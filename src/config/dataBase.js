@@ -3,18 +3,20 @@ const mongoose = require("mongoose");
 let isConnected = false;
 
 const connectDB = async () => {
-    if (isConnected) {
-        return;
+    if (isConnected && mongoose.connection.readyState === 1) {
+        return mongoose.connection;
     }
     
     try {
-        const opts = {
-            bufferCommands: false,
-        };
-        
-        await mongoose.connect(process.env.DB_URL, opts);
-        isConnected = true;
+        if (mongoose.connection.readyState === 0) {
+            const connection = await mongoose.connect(process.env.DB_URL);
+            isConnected = true;
+            console.log("[DB] MongoDB connected successfully");
+            return connection;
+        }
+        return mongoose.connection;
     } catch (error) {
+        console.error("[DB] Connection error:", error);
         throw error;
     }
 }

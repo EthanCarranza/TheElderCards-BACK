@@ -13,8 +13,14 @@ const cloudinary = require("cloudinary").v2;
 const cors = require("cors");
 const app = express();
 
-connectDB().catch(err => {
-  console.error("Database connection failed:", err);
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("[Middleware] DB connection failed:", error);
+    res.status(500).json({ error: "Database connection failed", message: error.message });
+  }
 });
 
 cloudinary.config({
@@ -78,11 +84,6 @@ app.get("/api/v1/health", async (req, res) => {
       error: error.message
     });
   }
-});
-
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
 });
 
 app.use((err, req, res, next) => {
