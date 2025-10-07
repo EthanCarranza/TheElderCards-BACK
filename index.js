@@ -54,43 +54,11 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/api/v1/health", async (req, res) => {
-  try {
-    const mongoose = require('mongoose');
-    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
-    
-    if (dbStatus === "connected") {
-      const testQuery = await mongoose.connection.db.admin().ping();
-    }
-    
-    res.json({ 
-      status: "OK", 
-      timestamp: new Date().toISOString(),
-      database: dbStatus,
-      mongoose: mongoose.version
-    });
-  } catch (error) {
-    console.error("[Health] DB Error:", error);
-    res.status(500).json({
-      status: "ERROR",
-      timestamp: new Date().toISOString(),
-      database: "error",
-      error: error.message
-    });
-  }
-});
-
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
-});
-
-app.use((err, req, res, next) => {
-  console.error(`[ERROR] ${req.method} ${req.path}:`, err);
-  res.status(500).json({ 
-    error: "Internal Server Error", 
-    message: err.message,
-    path: req.path 
+app.get("/api/v1/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    database: "connected"
   });
 });
 

@@ -7,7 +7,6 @@ const CardInteraction = require("../models/cardInteraction");
 const { generateFramedImage } = require("../../utils/cardGenerator");
 const getCards = async (req, res, next) => {
   try {
-    console.log("[getCards] Starting request with query:", req.query);
     const {
       page = 1,
       limit = 20,
@@ -106,7 +105,6 @@ const getCards = async (req, res, next) => {
       .skip(skip)
       .limit(parseInt(limit));
     const total = await Card.countDocuments(query);
-    console.log("[getCards] Found", cards.length, "cards, total:", total);
     return res.status(HTTP_RESPONSES.OK).json({
       cards,
       total,
@@ -115,10 +113,9 @@ const getCards = async (req, res, next) => {
       totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (error) {
-    console.error("[getCards] Error:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json({ error: "Server error", message: error.message });
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 const getAllCards = async (req, res, next) => {
