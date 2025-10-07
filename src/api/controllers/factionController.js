@@ -32,12 +32,15 @@ const createFaction = async (req, res, next) => {
 };
 const getFactions = async (req, res, next) => {
   try {
+    console.log("[getFactions] Starting request");
     const factions = await Faction.find();
+    console.log("[getFactions] Found", factions.length, "factions");
     return res.status(HTTP_RESPONSES.OK).json(factions);
   } catch (error) {
+    console.error("[getFactions] Error:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+      .json({ error: "Server error", message: error.message });
   }
 };
 const getFactionById = async (req, res, next) => {
