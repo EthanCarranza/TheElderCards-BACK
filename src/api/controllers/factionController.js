@@ -32,7 +32,9 @@ const createFaction = async (req, res, next) => {
 };
 const getFactions = async (req, res, next) => {
   try {
+    console.log("[getFactions] Starting request");
     const factions = await Faction.find();
+    console.log("[getFactions] Found", factions.length, "factions");
     return res.status(HTTP_RESPONSES.OK).json(factions);
   } catch (error) {
     console.error("[getFactions] Error:", error);
