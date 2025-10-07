@@ -1,13 +1,14 @@
 {
+  "version": 2,
   "functions": {
-    "api/*.js": {
+    "vercel-handler.js": {
       "maxDuration": 30
     }
   },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/api/index"
+      "destination": "/vercel-handler.js"
     }
   ]
 }
