@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-
 const cardInteractionSchema = new mongoose.Schema(
   {
     userId: {
@@ -32,9 +31,6 @@ const cardInteractionSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
-// Índice único para evitar duplicados de usuario-carta
 cardInteractionSchema.index({ userId: 1, cardId: 1 }, { unique: true });
-
 const CardInteraction = mongoose.model("CardInteraction", cardInteractionSchema);
 module.exports = CardInteraction;

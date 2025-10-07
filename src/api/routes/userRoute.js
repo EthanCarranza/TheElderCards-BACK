@@ -8,10 +8,8 @@ const {
   updateImage,
   deleteUser,
 } = require("../controllers/userController");
-
 const usersRouter = require("express").Router();
 const { uploadProfile } = require("../../middlewares/fileStorage");
-
 usersRouter.get("/", getUsers);
 usersRouter.get("/:id", isAuth, getUserById);
 usersRouter.post("/register", register);
@@ -24,5 +22,4 @@ usersRouter.put(
   updateImage
 );
 usersRouter.delete("/:id", isAuth, deleteUser);
-
 module.exports = usersRouter;

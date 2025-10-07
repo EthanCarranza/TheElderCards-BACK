@@ -9,11 +9,9 @@ const {
   updateFaction,
   deleteFaction,
 } = require("../controllers/factionController");
-
 router.get("/", getFactions);
 router.get("/:id", getFactionById);
 router.post("/", isAdmin, uploadFaction.single("img"), createFaction);
 router.put("/:id", isAdmin, uploadFaction.single("img"), updateFaction);
 router.delete("/:id", isAdmin, deleteFaction);
-
 module.exports = router;

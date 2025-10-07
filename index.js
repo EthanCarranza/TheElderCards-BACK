@@ -21,7 +21,19 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
 });
 
-app.use(cors());
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:5173",
+  process.env.FRONTEND_PROD_URL,
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json());
 
 app.use("/api/v1/users", usersRouter);
@@ -36,6 +48,7 @@ app.use("*", (req, res, next) => {
   return res.status(404).json("Route Not Found");
 });
 
-app.listen(4200, () => {
-  console.log("Server is running on port 4200");
+const PORT = process.env.PORT || 4200;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });

@@ -5,14 +5,19 @@ const Faction = require("../models/faction");
 const Collection = require("../models/collection");
 const CardInteraction = require("../models/cardInteraction");
 const { generateFramedImage } = require("../../utils/cardGenerator");
-
 const getCards = async (req, res, next) => {
   try {
-    console.log("Fetching cards with filters:", req.query);
-    const { page = 1, limit = 20, sort, user: userId, favorites, liked, mostLiked, ...filters } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      sort,
+      user: userId,
+      favorites,
+      liked,
+      mostLiked,
+      ...filters
+    } = req.query;
     const query = {};
-    
-    // Filtros básicos
     if (filters.type) query.type = filters.type;
     if (filters.faction) query.faction = filters.faction;
     if (filters.title) query.title = { $regex: filters.title, $options: "i" };
@@ -24,41 +29,36 @@ const getCards = async (req, res, next) => {
       if (filters.attack) query.attack = filters.attack;
       if (filters.defense) query.defense = filters.defense;
     }
-
-    // Manejo de filtros especiales por interacciones
     let cardIds = null;
-    
     if (favorites === "true" && userId) {
       const favoriteInteractions = await CardInteraction.find({
         userId,
-        favorited: true
+        favorited: true,
       }).select("cardId");
-      cardIds = favoriteInteractions.map(interaction => interaction.cardId);
+      cardIds = favoriteInteractions.map((interaction) => interaction.cardId);
     }
-    
     if (liked === "true" && userId) {
       const likedInteractions = await CardInteraction.find({
         userId,
-        liked: true
+        liked: true,
       }).select("cardId");
-      const likedIds = likedInteractions.map(interaction => interaction.cardId);
-      
+      const likedIds = likedInteractions.map(
+        (interaction) => interaction.cardId
+      );
       if (cardIds) {
-        // Intersección si ya hay filtro de favoritos
-        cardIds = cardIds.filter(id => likedIds.some(likedId => likedId.toString() === id.toString()));
+        cardIds = cardIds.filter((id) =>
+          likedIds.some((likedId) => likedId.toString() === id.toString())
+        );
       } else {
         cardIds = likedIds;
       }
     }
-
     if (cardIds !== null) {
       query._id = { $in: cardIds };
     }
-
     let sortObj = {};
     if (sort) {
       if (sort === "most_liked") {
-        // Para ordenar por más likes, necesitamos una agregación
         const pipeline = [
           { $match: query },
           {
@@ -66,8 +66,8 @@ const getCards = async (req, res, next) => {
               from: "cardinteractions",
               localField: "_id",
               foreignField: "cardId",
-              as: "interactions"
-            }
+              as: "interactions",
+            },
           },
           {
             $addFields: {
@@ -75,20 +75,18 @@ const getCards = async (req, res, next) => {
                 $size: {
                   $filter: {
                     input: "$interactions",
-                    cond: { $eq: ["$$this.liked", true] }
-                  }
-                }
-              }
-            }
+                    cond: { $eq: ["$$this.liked", true] },
+                  },
+                },
+              },
+            },
           },
           { $sort: { likesCount: -1 } },
           { $skip: (parseInt(page) - 1) * parseInt(limit) },
-          { $limit: parseInt(limit) }
+          { $limit: parseInt(limit) },
         ];
-
         const cards = await Card.aggregate(pipeline);
         const total = await Card.countDocuments(query);
-
         return res.status(HTTP_RESPONSES.OK).json({
           cards,
           total,
@@ -101,15 +99,12 @@ const getCards = async (req, res, next) => {
         sortObj[field] = direction === "desc" ? -1 : 1;
       }
     }
-
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const cards = await Card.find(query)
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
-
     const total = await Card.countDocuments(query);
-
     return res.status(HTTP_RESPONSES.OK).json({
       cards,
       total,
@@ -118,13 +113,11 @@ const getCards = async (req, res, next) => {
       totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const getAllCards = async (req, res, next) => {
   try {
     const cards = await Card.find();
@@ -133,17 +126,13 @@ const getAllCards = async (req, res, next) => {
     }
     return res.status(HTTP_RESPONSES.NOT_FOUND).json("No hay cartas");
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const createCard = async (req, res, next) => {
   try {
-    console.log("[createCard] req.body:", req.body);
-    console.log("[createCard] req.file:", req.file);
     const {
       title,
       date,
@@ -155,27 +144,23 @@ const createCard = async (req, res, next) => {
       attack,
       defense,
     } = req.body;
-
     if (!title || !description || !type || !faction || !cost) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Faltan datos obligatorios" });
     }
-
     const factionObj = await Faction.findById(faction);
     if (!factionObj) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Faccion no valida" });
+        .json({ message: "Facción no válida" });
     }
     const frameColor = factionObj.color || "#cccccc";
-
     if (!req.file || !req.file.path) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "No se recibio archivo de imagen" });
+        .json({ message: "No se recibió archivo de imagen" });
     }
-
     const parsedCost = Number(cost);
     if (Number.isNaN(parsedCost)) {
       return res
@@ -187,7 +172,6 @@ const createCard = async (req, res, next) => {
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "El coste debe estar entre 0 y 10" });
     }
-
     let parsedAttack;
     let parsedDefense;
     if (type === "Creature") {
@@ -208,7 +192,7 @@ const createCard = async (req, res, next) => {
       if (Number.isNaN(parsedAttack) || Number.isNaN(parsedDefense)) {
         return res
           .status(HTTP_RESPONSES.BAD_REQUEST)
-          .json({ message: "Ataque o defensa no validos" });
+          .json({ message: "Ataque o defensa no válidos" });
       }
       if (
         parsedAttack < 0 ||
@@ -221,7 +205,6 @@ const createCard = async (req, res, next) => {
         });
       }
     }
-
     const creatorName =
       (req.user && (req.user.username || req.user.email)) ||
       creator ||
@@ -229,7 +212,7 @@ const createCard = async (req, res, next) => {
     const normalizedCreator =
       typeof creatorName === "string" && creatorName.trim().length > 0
         ? creatorName.trim()
-        : String(creatorName || "Anonimo");
+        : String(creatorName || "Anónimo");
     const imgUrl = await generateFramedImage(
       req.file.path,
       title,
@@ -241,13 +224,11 @@ const createCard = async (req, res, next) => {
       type === "Creature" ? parsedAttack : undefined,
       type === "Creature" ? parsedDefense : undefined
     );
-
     if (!imgUrl) {
       return res
         .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
         .json({ message: "No se pudo generar la imagen de la carta" });
     }
-
     const normalizedTitle =
       typeof title === "string" ? title.trim() : String(title);
     const normalizedDescription =
@@ -258,7 +239,6 @@ const createCard = async (req, res, next) => {
     if (Number.isNaN(parsedDate.getTime())) {
       parsedDate = new Date();
     }
-
     const cardData = {
       title: normalizedTitle,
       description: normalizedDescription,
@@ -269,25 +249,20 @@ const createCard = async (req, res, next) => {
       creator: normalizedCreator,
       date: parsedDate,
     };
-
     if (type === "Creature") {
       cardData.attack = parsedAttack;
       cardData.defense = parsedDefense;
     }
-
     const savedCard = await Card.create(cardData);
     await savedCard.populate("faction");
     return res.status(HTTP_RESPONSES.CREATED).json(savedCard);
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const mockCreateCard = createCard;
-
 const getCardById = async (req, res, next) => {
   try {
     const card = await Card.findById(req.params.id);
@@ -296,13 +271,11 @@ const getCardById = async (req, res, next) => {
     }
     return res.status(HTTP_RESPONSES.OK).json(card);
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const updateCard = async (req, res, next) => {
   try {
     const card = await Card.findByIdAndUpdate(req.params.id, req.body, {
@@ -313,50 +286,40 @@ const updateCard = async (req, res, next) => {
     }
     return res.status(HTTP_RESPONSES.OK).json(card);
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const deleteCard = async (req, res, next) => {
   try {
     const { id } = req.params;
     const card = await Card.findById(id);
-
     if (!card) {
       return res.status(HTTP_RESPONSES.NOT_FOUND).json("Carta no encontrada");
     }
-
-    // Verificar permisos: el creador puede eliminar su carta, o admin puede eliminar cualquiera
     const userCreator = req.user?.username || req.user?.email || "Anonimo";
     const isAdmin = req.user?.role === "admin";
     const isOwner = card.creator.toLowerCase() === userCreator.toLowerCase();
-
     if (!isAdmin && !isOwner) {
       return res
         .status(HTTP_RESPONSES.FORBIDDEN)
         .json({ message: "No tienes permiso para eliminar esta carta" });
     }
-
     await Card.findByIdAndDelete(id);
     return res
       .status(HTTP_RESPONSES.OK)
       .json({ message: "Carta eliminada correctamente" });
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const addToCollection = async (req, res, next) => {
   try {
     const { collectionId, cardId } = req.body;
     const userId = req.user._id;
-
     let collection = await Collection.findById(collectionId);
     if (!collection) {
       return res
@@ -382,18 +345,15 @@ const addToCollection = async (req, res, next) => {
       .status(HTTP_RESPONSES.OK)
       .json({ cards: collection.cards, added: true });
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const removeFromCollection = async (req, res, next) => {
   try {
     const { collectionId, cardId } = req.body;
     const userId = req.user._id;
-
     const collection = await Collection.findById(collectionId);
     if (!collection) {
       return res
@@ -418,13 +378,11 @@ const removeFromCollection = async (req, res, next) => {
       .status(HTTP_RESPONSES.OK)
       .json({ cards: collection.cards, removed });
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const addToFavorites = async (req, res, next) => {
   try {
     const userId = req.user._id;
@@ -439,13 +397,11 @@ const addToFavorites = async (req, res, next) => {
     }
     return res.status(HTTP_RESPONSES.OK).json(user.favorites);
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 const removeFromFavorites = async (req, res, next) => {
   try {
     const userId = req.user._id;
@@ -458,13 +414,11 @@ const removeFromFavorites = async (req, res, next) => {
     await user.save();
     return res.status(HTTP_RESPONSES.OK).json(user.favorites);
   } catch (error) {
-    console.log(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
-
 module.exports = {
   getCards,
   getAllCards,
@@ -476,6 +430,5 @@ module.exports = {
   removeFromCollection,
   addToFavorites,
   removeFromFavorites,
-
   mockCreateCard,
 };

@@ -1,7 +1,6 @@
 const User = require("../api/models/user");
 const { verificarLlave } = require("../utils/jwt");
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../api/models/httpResponses");
-
 const isAuth = async (req, res, next) => {
   try {
     const token = req.headers.authorization;
@@ -22,7 +21,6 @@ const isAuth = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    console.error(error);
     if (
       error.name === "JsonWebTokenError" ||
       error.name === "TokenExpiredError"
@@ -36,7 +34,6 @@ const isAuth = async (req, res, next) => {
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
   }
 };
-
 const isAdmin = async (req, res, next) => {
   try {
     const token = req.headers.authorization;
@@ -62,7 +59,6 @@ const isAdmin = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    console.error(error);
     if (
       error.name === "JsonWebTokenError" ||
       error.name === "TokenExpiredError"
@@ -76,5 +72,4 @@ const isAdmin = async (req, res, next) => {
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
   }
 };
-
 module.exports = { isAuth, isAdmin };

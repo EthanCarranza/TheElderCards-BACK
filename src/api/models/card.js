@@ -1,8 +1,7 @@
 const mongoose = require("mongoose");
-
 const cardSchema = new mongoose.Schema(
   {
-    img: { type: String, trim: true, required: true }, //ya compuesta
+    img: { type: String, trim: true, required: true },
     title: { type: String, required: true },
     description: { type: String, required: true },
     type: {
@@ -39,6 +38,5 @@ const cardSchema = new mongoose.Schema(
     collection: "cards",
   }
 );
-
 const Card = mongoose.model("Card", cardSchema);
 module.exports = Card;
