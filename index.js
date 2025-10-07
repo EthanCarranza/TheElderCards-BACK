@@ -24,17 +24,43 @@ cloudinary.config({
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:5173",
   process.env.FRONTEND_PROD_URL,
+  "https://the-elder-cards-front.vercel.app"
 ].filter(Boolean);
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Access-Control-Allow-Origin"],
+    optionsSuccessStatus: 200
   })
 );
 app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "The Elder Cards API is running", 
+    timestamp: new Date().toISOString(),
+    version: "1.0.0"
+  });
+});
+
+app.get("/api/v1/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    database: "connected"
+  });
+});
 
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/cards", cardsRouter);
@@ -50,7 +76,7 @@ app.use("*", (req, res, next) => {
 
 const PORT = process.env.PORT || 4200;
 
-if (process.env.NODE_ENV !== 'production') {
+if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
