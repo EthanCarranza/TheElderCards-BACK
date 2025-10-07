@@ -8,7 +8,9 @@ const HTTP_RESPONSES = {
   FORBIDDEN: 403,
   CONFLICT: 409,
 };
+
 const HTTP_MESSAGES = {
   INTERNAL_SERVER_ERROR: 'Internal Server Error. Please try again later.',
 };
+
 module.exports = { HTTP_RESPONSES, HTTP_MESSAGES };

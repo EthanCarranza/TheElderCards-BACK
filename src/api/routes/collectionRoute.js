@@ -15,7 +15,9 @@ const {
   getFavoriteCollections,
 } = require("../controllers/collectionController");
 const { uploadCollection } = require("../../middlewares/fileStorage");
+
 const collectionRouter = express.Router();
+
 collectionRouter.get("/", getCollections);
 collectionRouter.get("/by/user/:userId", getCollectionsByUser);
 collectionRouter.get("/mine", isAuth, getMyCollections);
@@ -33,4 +35,5 @@ collectionRouter.put("/:id/removeCard", isAuth, removeCardFromCollection);
 collectionRouter.post("/:id/favorite", isAuth, addFavoriteCollection);
 collectionRouter.delete("/:id/favorite", isAuth, removeFavoriteCollection);
 collectionRouter.get("/favorites/mine", isAuth, getFavoriteCollections);
+
 module.exports = collectionRouter;
