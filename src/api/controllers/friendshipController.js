@@ -333,30 +333,38 @@ const unblockUser = async (req, res) => {
 
 const searchUsers = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, all } = req.query;
     const userId = req.user.id;
 
-    if (!q || q.trim().length < 2) {
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
-        message: "La búsqueda debe tener al menos 2 caracteres",
-      });
+    let users;
+
+    if (all === "true") {
+      users = await User.find({ _id: { $ne: userId } })
+        .select("username email image")
+        .limit(50);
+    } else {
+      if (!q || q.trim().length < 2) {
+        return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+          message: "La búsqueda debe tener al menos 2 caracteres",
+        });
+      }
+
+      const searchTerm = q.trim();
+
+      users = await User.find({
+        $and: [
+          { _id: { $ne: userId } },
+          {
+            $or: [
+              { username: { $regex: searchTerm, $options: "i" } },
+              { email: { $regex: searchTerm, $options: "i" } },
+            ],
+          },
+        ],
+      })
+        .select("username email image")
+        .limit(20);
     }
-
-    const searchTerm = q.trim();
-
-    const users = await User.find({
-      $and: [
-        { _id: { $ne: userId } },
-        {
-          $or: [
-            { username: { $regex: searchTerm, $options: "i" } },
-            { email: { $regex: searchTerm, $options: "i" } },
-          ],
-        },
-      ],
-    })
-      .select("username email image")
-      .limit(20);
 
     const usersWithStatus = await Promise.all(
       users.map(async (user) => {
@@ -385,7 +393,7 @@ const searchUsers = async (req, res) => {
 
     return res.status(HTTP_RESPONSES.OK).json({
       users: usersWithStatus,
-      query: searchTerm,
+      query: q || "todos",
     });
   } catch (error) {
     console.error("Error al buscar usuarios:", error);
