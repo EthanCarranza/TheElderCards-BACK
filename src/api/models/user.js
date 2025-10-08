@@ -15,18 +15,6 @@ const userSchema = new mongoose.Schema(
       default: "user",
       enum: ["admin", "user"],
     },
-    favorites: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Card",
-      },
-    ],
-    favoriteCollections: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Collection",
-      },
-    ],
   },
   {
     collection: "users",

@@ -1,5 +1,6 @@
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Collection = require("../models/collection");
+const CollectionInteraction = require("../models/collectionInteraction");
 const User = require("../models/user");
 const mongoose = require("mongoose");
 const {
@@ -27,50 +28,49 @@ const isOwner = (creatorId, userId) => {
 
 const getCollections = async (req, res, next) => {
   try {
-    const publicCollections = await Collection.find({
-      isPrivate: false,
-    }).populate("cards");
+    let collections = await Collection.find({ isPrivate: false })
+      .populate("cards")
+      .exec();
 
-    let collections = publicCollections;
+    collections = await Promise.all(collections.map(async (collection) => {
+      try {
+        const populated = await Collection.populate(collection, {
+          path: "creator",
+          select: "username email"
+        });
+        return populated;
+      } catch (error) {
+        collection.creator = DELETED_USER_PLACEHOLDER;
+        return collection;
+      }
+    }));
 
     if (req.user) {
-      const userId = req.user._id ? req.user._id.toString() : req.user.id;
-      const privateCollections = await Collection.find({
-        creator: userId,
-        isPrivate: true,
-      }).populate("cards");
+      const userId = req.user._id;
+      let privateCollections = await Collection.find({ 
+        creator: userId, 
+        isPrivate: true 
+      })
+        .populate("cards")
+        .exec();
+
+      privateCollections = await Promise.all(privateCollections.map(async (collection) => {
+        try {
+          const populated = await Collection.populate(collection, {
+            path: "creator",
+            select: "username email"
+          });
+          return populated;
+        } catch (error) {
+          collection.creator = DELETED_USER_PLACEHOLDER;
+          return collection;
+        }
+      }));
 
       collections = [...collections, ...privateCollections];
     }
 
-    const processedCollections = await Promise.all(
-      collections.map(async (collection) => {
-        const processed = collection.toObject();
-
-        try {
-          const User = require("../models/user");
-          const creator = await User.findById(processed.creator).select(
-            "username email"
-          );
-
-          if (creator) {
-            processed.creator = {
-              _id: creator._id,
-              username: creator.username,
-              email: creator.email,
-            };
-          } else {
-            processed.creator = DELETED_USER_PLACEHOLDER;
-          }
-        } catch (error) {
-          processed.creator = DELETED_USER_PLACEHOLDER;
-        }
-
-        return processed;
-      })
-    );
-
-    return res.status(HTTP_RESPONSES.OK).json(processedCollections);
+    return res.status(HTTP_RESPONSES.OK).json(collections);
   } catch (error) {
     console.log(error);
     return res
@@ -105,10 +105,20 @@ const getCollectionById = async (req, res, next) => {
         .json("No tienes permiso para ver esta colección privada");
     }
 
-    const populatedCollection = await applySafePopulate(
-      Collection.findById(id).populate("cards"),
-      safePopulateUser("creator", "username email")
-    );
+    let populatedCollection = await Collection.findById(id)
+      .populate("cards")
+      .exec();
+      
+    if (populatedCollection) {
+      try {
+        populatedCollection = await Collection.populate(populatedCollection, {
+          path: "creator",
+          select: "username email"
+        });
+      } catch (error) {
+        populatedCollection.creator = DELETED_USER_PLACEHOLDER;
+      }
+    }
 
     return res.status(HTTP_RESPONSES.OK).json(populatedCollection);
   } catch (error) {
@@ -125,13 +135,19 @@ const getCollectionByTitle = async (req, res, next) => {
     if (!title) {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json("Titulo faltante");
     }
-    let collection = await Collection.findOne({ title }).populate("cards");
+    let collection = await Collection.findOne({ title })
+      .populate("cards")
+      .exec();
 
     if (collection) {
-      collection = await applySafePopulate(
-        Collection.findById(collection._id).populate("cards"),
-        safePopulateUser("creator", "username email")
-      );
+      try {
+        collection = await Collection.populate(collection, {
+          path: "creator",
+          select: "username email"
+        });
+      } catch (error) {
+        collection.creator = DELETED_USER_PLACEHOLDER;
+      }
     }
     if (!collection) {
       return res
@@ -166,7 +182,7 @@ const createCollection = async (req, res, next) => {
       title,
       description: req.body.description || "",
       img: req.file ? req.file.path : null,
-      creator: req.user._id.toString(),
+      creator: req.user._id,
       isPrivate: req.body.isPrivate === true || req.body.isPrivate === "true",
       cards: Array.isArray(req.body.cards) ? req.body.cards : [],
     });
@@ -472,21 +488,30 @@ const getCollectionsByUser = async (req, res) => {
 
     let collections;
     if (req.user && isOwner(userId, req.user._id)) {
-      const allQuery = Collection.find({ creator: userId }).populate("cards");
-      collections = await applySafePopulate(
-        allQuery,
-        safePopulateUser("creator", "username email")
-      );
+      collections = await Collection.find({ creator: userId })
+        .populate("cards")
+        .exec();
     } else {
-      const publicQuery = Collection.find({
+      collections = await Collection.find({
         creator: userId,
         isPrivate: false,
-      }).populate("cards");
-      collections = await applySafePopulate(
-        publicQuery,
-        safePopulateUser("creator", "username email")
-      );
+      })
+        .populate("cards")
+        .exec();
     }
+
+    collections = await Promise.all(collections.map(async (collection) => {
+      try {
+        const populated = await Collection.populate(collection, {
+          path: "creator",
+          select: "username email"
+        });
+        return populated;
+      } catch (error) {
+        collection.creator = DELETED_USER_PLACEHOLDER;
+        return collection;
+      }
+    }));
     return res.status(HTTP_RESPONSES.OK).json(collections || []);
   } catch (error) {
     console.log(error);
@@ -503,9 +528,23 @@ const getMyCollections = async (req, res) => {
         .status(HTTP_RESPONSES.UNAUTHORIZED)
         .json({ message: "Token no proporcionado, acceso no autorizado" });
     }
-    const collections = await Collection.find({
+    let collections = await Collection.find({
       creator: req.user._id.toString(),
-    }).populate("cards");
+    }).populate("cards").exec();
+
+    collections = await Promise.all(collections.map(async (collection) => {
+      try {
+        const populated = await Collection.populate(collection, {
+          path: "creator",
+          select: "username email"
+        });
+        return populated;
+      } catch (error) {
+        collection.creator = DELETED_USER_PLACEHOLDER;
+        return collection;
+      }
+    }));
+
     return res.status(HTTP_RESPONSES.OK).json(collections || []);
   } catch (error) {
     console.log(error);
@@ -528,18 +567,28 @@ const addFavoriteCollection = async (req, res) => {
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Id de colección inválido" });
     }
-    const exists = await Collection.findById(id);
-    if (!exists) {
+    
+    const collection = await Collection.findById(id);
+    if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
         .json({ message: "Colección no encontrada" });
     }
-    const user = await User.findById(req.user._id);
-    if (!user.favoriteCollections.map((c) => c.toString()).includes(id)) {
-      user.favoriteCollections.push(id);
-      await user.save();
+
+    const userId = req.user.id;
+    let interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+
+    if (!interaction) {
+      interaction = new CollectionInteraction({ userId, collectionId: id });
     }
-    return res.status(HTTP_RESPONSES.OK).json(user.favoriteCollections);
+
+    if (!interaction.favorited) {
+      interaction.favorited = true;
+      interaction.favoritedAt = new Date();
+      await interaction.save();
+    }
+
+    return res.status(HTTP_RESPONSES.OK).json({ success: true });
   } catch (error) {
     console.log(error);
     return res
@@ -556,12 +605,16 @@ const removeFavoriteCollection = async (req, res) => {
         .json({ message: "Token no proporcionado, acceso no autorizado" });
     }
     const { id } = req.params;
-    const user = await User.findById(req.user._id);
-    user.favoriteCollections = user.favoriteCollections.filter(
-      (c) => c.toString() !== id
-    );
-    await user.save();
-    return res.status(HTTP_RESPONSES.OK).json(user.favoriteCollections);
+    const userId = req.user.id;
+    
+    const interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+    if (interaction && interaction.favorited) {
+      interaction.favorited = false;
+      interaction.favoritedAt = null;
+      await interaction.save();
+    }
+
+    return res.status(HTTP_RESPONSES.OK).json({ success: true });
   } catch (error) {
     console.log(error);
     return res
@@ -571,23 +624,7 @@ const removeFavoriteCollection = async (req, res) => {
 };
 
 const getFavoriteCollections = async (req, res) => {
-  try {
-    if (!req.user) {
-      return res
-        .status(HTTP_RESPONSES.UNAUTHORIZED)
-        .json({ message: "Token no proporcionado, acceso no autorizado" });
-    }
-    const user = await User.findById(req.user._id).populate({
-      path: "favoriteCollections",
-      populate: { path: "cards" },
-    });
-    return res.status(HTTP_RESPONSES.OK).json(user?.favoriteCollections || []);
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
+  return getUserFavoriteCollectionsNew(req, res);
 };
 
 const debugCollection = async (req, res) => {
@@ -632,3 +669,188 @@ module.exports.addFavoriteCollection = addFavoriteCollection;
 module.exports.removeFavoriteCollection = removeFavoriteCollection;
 module.exports.getFavoriteCollections = getFavoriteCollections;
 module.exports.debugCollection = debugCollection;
+
+
+const toggleLike = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "ID de colección requerido" });
+    }
+
+    const collection = await Collection.findById(id);
+    if (!collection) {
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Colección no encontrada" });
+    }
+
+    let interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+
+    if (!interaction) {
+      interaction = new CollectionInteraction({ userId, collectionId: id });
+    }
+
+    const newLikedState = !interaction.liked;
+    interaction.liked = newLikedState;
+    interaction.likedAt = newLikedState ? new Date() : null;
+
+    await interaction.save();
+
+    const stats = await getCollectionStats(id);
+
+    return res.status(HTTP_RESPONSES.OK).json({
+      liked: newLikedState,
+      stats,
+    });
+  } catch (error) {
+    console.error("Error al actualizar like:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const toggleFavoriteNew = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "ID de colección requerido" });
+    }
+
+    const collection = await Collection.findById(id);
+    if (!collection) {
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Colección no encontrada" });
+    }
+
+    let interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+
+    if (!interaction) {
+      interaction = new CollectionInteraction({ userId, collectionId: id });
+    }
+
+    const newFavoritedState = !interaction.favorited;
+    interaction.favorited = newFavoritedState;
+    interaction.favoritedAt = newFavoritedState ? new Date() : null;
+
+    await interaction.save();
+
+    const stats = await getCollectionStats(id);
+
+    return res.status(HTTP_RESPONSES.OK).json({
+      favorited: newFavoritedState,
+      stats,
+    });
+  } catch (error) {
+    console.error("Error al actualizar favorito:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const getCollectionStatistics = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "ID de colección requerido" });
+    }
+
+    const stats = await getCollectionStats(id);
+    return res.status(HTTP_RESPONSES.OK).json(stats);
+  } catch (error) {
+    console.error("Error al obtener estadísticas:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const getUserCollectionInteraction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+
+    return res.status(HTTP_RESPONSES.OK).json({
+      liked: interaction?.liked || false,
+      favorited: interaction?.favorited || false,
+    });
+  } catch (error) {
+    console.error("Error al obtener interacción:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const getUserFavoriteCollectionsNew = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    let favoriteInteractions;
+    try {
+      favoriteInteractions = await CollectionInteraction.find({
+        userId,
+        favorited: true,
+      })
+        .populate({
+          path: "collectionId",
+          populate: { 
+            path: "cards creator",
+            select: "username email" 
+          },
+        })
+        .sort({ favoritedAt: -1 });
+    } catch (error) {
+      console.warn("Populate failed in getUserFavoriteCollections:", error.message);
+      favoriteInteractions = await CollectionInteraction.find({
+        userId,
+        favorited: true,
+      }).sort({ favoritedAt: -1 });
+    }
+
+    const collections = favoriteInteractions
+      .map((interaction) => interaction.collectionId)
+      .filter(collection => collection); // Filtrar nulls
+
+    return res.status(HTTP_RESPONSES.OK).json(collections);
+  } catch (error) {
+    console.error("Error al obtener colecciones favoritas:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const getCollectionStats = async (collectionId) => {
+  const [likesCount, favoritesCount] = await Promise.all([
+    CollectionInteraction.countDocuments({ collectionId, liked: true }),
+    CollectionInteraction.countDocuments({ collectionId, favorited: true }),
+  ]);
+
+  return {
+    likes: likesCount,
+    favorites: favoritesCount,
+  };
+};
+
+module.exports.toggleLike = toggleLike;
+module.exports.toggleFavoriteNew = toggleFavoriteNew;
+module.exports.getCollectionStatistics = getCollectionStatistics;
+module.exports.getUserCollectionInteraction = getUserCollectionInteraction;
+module.exports.getUserFavoriteCollectionsNew = getUserFavoriteCollectionsNew;

@@ -47,7 +47,19 @@ const applySafePopulate = async (query, populateConfig) => {
     
   } catch (error) {
     console.warn(`Safe populate failed for ${populateConfig.path}:`, error.message);
-    const result = await query.exec();
+    
+    let result;
+    try {
+      result = await query.clone().exec(); // Usar clone() para evitar "already executed"
+    } catch (execError) {
+      console.error(`Failed to execute cloned query:`, execError.message);
+      try {
+        result = await query.exec();
+      } catch (originalError) {
+        console.error(`Failed to execute original query:`, originalError.message);
+        throw originalError;
+      }
+    }
     
     const addPlaceholder = (doc) => {
       if (doc && populateConfig.path) {
@@ -56,7 +68,7 @@ const applySafePopulate = async (query, populateConfig) => {
       return doc;
     };
     
-    if (Array.isArray(result) && result.length > 0) {
+    if (Array.isArray(result)) {
       return result.map(addPlaceholder);
     } else if (result) {
       return addPlaceholder(result);
@@ -90,7 +102,14 @@ const safePopulate = async (query, populateOptions) => {
 
 const cleanupOrphanedReferences = async (Model, userField = 'creator') => {
   try {
-    const User = mongoose.model('users');
+    // Verificar si el modelo User está registrado
+    let User;
+    try {
+      User = mongoose.model('users');
+    } catch (error) {
+      console.warn('User model not found:', error.message);
+      return 0;
+    }
     
     const docs = await Model.find({});
     const orphanedDocs = [];

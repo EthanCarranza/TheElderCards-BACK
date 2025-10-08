@@ -3,9 +3,13 @@ const mongoose = require("mongoose");
 const collectionSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    description: { type: String, required: false, trim: true },
-    img: { type: String, trim: true, required: false },
-    creator: { type: String, required: true },
+    description: { type: String, trim: true },
+    img: { type: String, trim: true },
+    creator: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User", 
+      required: true 
+    },
     isPrivate: { type: Boolean, default: false },
     cards: [
       {
@@ -16,6 +20,7 @@ const collectionSchema = new mongoose.Schema(
   },
   {
     collection: "collections",
+    timestamps: true,
   }
 );
 
