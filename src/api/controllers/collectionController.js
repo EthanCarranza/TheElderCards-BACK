@@ -5,7 +5,6 @@ const User = require("../models/user");
 const mongoose = require("mongoose");
 const {
   safePopulateUser,
-  applySafePopulate,
   DELETED_USER_PLACEHOLDER,
 } = require("../../utils/safePopulate");
 
@@ -26,24 +25,25 @@ const isOwner = (creatorId, userId) => {
   return creatorIdStr === userIdStr && creatorIdStr !== "";
 };
 
+const safePopulateCreator = async (collection) => {
+  try {
+    return await Collection.populate(collection, {
+      path: "creator",
+      select: "username email"
+    });
+  } catch (error) {
+    collection.creator = DELETED_USER_PLACEHOLDER;
+    return collection;
+  }
+};
+
 const getCollections = async (req, res, next) => {
   try {
     let collections = await Collection.find({ isPrivate: false })
       .populate("cards")
       .exec();
 
-    collections = await Promise.all(collections.map(async (collection) => {
-      try {
-        const populated = await Collection.populate(collection, {
-          path: "creator",
-          select: "username email"
-        });
-        return populated;
-      } catch (error) {
-        collection.creator = DELETED_USER_PLACEHOLDER;
-        return collection;
-      }
-    }));
+    collections = await Promise.all(collections.map(safePopulateCreator));
 
     if (req.user) {
       const userId = req.user._id;
@@ -54,18 +54,7 @@ const getCollections = async (req, res, next) => {
         .populate("cards")
         .exec();
 
-      privateCollections = await Promise.all(privateCollections.map(async (collection) => {
-        try {
-          const populated = await Collection.populate(collection, {
-            path: "creator",
-            select: "username email"
-          });
-          return populated;
-        } catch (error) {
-          collection.creator = DELETED_USER_PLACEHOLDER;
-          return collection;
-        }
-      }));
+      privateCollections = await Promise.all(privateCollections.map(safePopulateCreator));
 
       collections = [...collections, ...privateCollections];
     }
@@ -466,16 +455,7 @@ const deleteCollection = async (req, res, next) => {
   }
 };
 
-module.exports = {
-  getCollections,
-  getCollectionById,
-  getCollectionByTitle,
-  createCollection,
-  updateCollection,
-  deleteCollection,
-  addCardToCollection: addCardToCollectionSecure,
-  removeCardFromCollection: removeCardFromCollectionSecure,
-};
+
 
 const getCollectionsByUser = async (req, res) => {
   try {
@@ -554,78 +534,9 @@ const getMyCollections = async (req, res) => {
   }
 };
 
-const addFavoriteCollection = async (req, res) => {
-  try {
-    if (!req.user) {
-      return res
-        .status(HTTP_RESPONSES.UNAUTHORIZED)
-        .json({ message: "Token no proporcionado, acceso no autorizado" });
-    }
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res
-        .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id de colección inválido" });
-    }
-    
-    const collection = await Collection.findById(id);
-    if (!collection) {
-      return res
-        .status(HTTP_RESPONSES.NOT_FOUND)
-        .json({ message: "Colección no encontrada" });
-    }
 
-    const userId = req.user.id;
-    let interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
 
-    if (!interaction) {
-      interaction = new CollectionInteraction({ userId, collectionId: id });
-    }
 
-    if (!interaction.favorited) {
-      interaction.favorited = true;
-      interaction.favoritedAt = new Date();
-      await interaction.save();
-    }
-
-    return res.status(HTTP_RESPONSES.OK).json({ success: true });
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
-const removeFavoriteCollection = async (req, res) => {
-  try {
-    if (!req.user) {
-      return res
-        .status(HTTP_RESPONSES.UNAUTHORIZED)
-        .json({ message: "Token no proporcionado, acceso no autorizado" });
-    }
-    const { id } = req.params;
-    const userId = req.user.id;
-    
-    const interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
-    if (interaction && interaction.favorited) {
-      interaction.favorited = false;
-      interaction.favoritedAt = null;
-      await interaction.save();
-    }
-
-    return res.status(HTTP_RESPONSES.OK).json({ success: true });
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
-const getFavoriteCollections = async (req, res) => {
-  return getUserFavoriteCollectionsNew(req, res);
-};
 
 const debugCollection = async (req, res) => {
   try {
@@ -663,12 +574,7 @@ const debugCollection = async (req, res) => {
   }
 };
 
-module.exports.getCollectionsByUser = getCollectionsByUser;
-module.exports.getMyCollections = getMyCollections;
-module.exports.addFavoriteCollection = addFavoriteCollection;
-module.exports.removeFavoriteCollection = removeFavoriteCollection;
-module.exports.getFavoriteCollections = getFavoriteCollections;
-module.exports.debugCollection = debugCollection;
+
 
 
 const toggleLike = async (req, res) => {
@@ -849,8 +755,23 @@ const getCollectionStats = async (collectionId) => {
   };
 };
 
-module.exports.toggleLike = toggleLike;
-module.exports.toggleFavoriteNew = toggleFavoriteNew;
-module.exports.getCollectionStatistics = getCollectionStatistics;
-module.exports.getUserCollectionInteraction = getUserCollectionInteraction;
-module.exports.getUserFavoriteCollectionsNew = getUserFavoriteCollectionsNew;
+module.exports = {
+  getCollections,
+  getCollectionById,
+  getCollectionByTitle,
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  addCardToCollection: addCardToCollectionSecure,
+  removeCardFromCollection: removeCardFromCollectionSecure,
+  getCollectionsByUser,
+  getMyCollections,
+  debugCollection,
+  toggleLike,
+  toggleFavoriteNew,
+  getCollectionStatistics,
+  getUserCollectionInteraction,
+  getUserFavoriteCollectionsNew,
+};
+
+

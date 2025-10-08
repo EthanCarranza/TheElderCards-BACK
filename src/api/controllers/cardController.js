@@ -1,6 +1,5 @@
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Card = require("../models/card");
-const User = require("../models/user");
 const Faction = require("../models/faction");
 const Collection = require("../models/collection");
 const CardInteraction = require("../models/cardInteraction");
@@ -439,45 +438,7 @@ const removeFromCollection = async (req, res, next) => {
   }
 };
 
-const addToFavorites = async (req, res, next) => {
-  try {
-    const userId = req.user._id;
-    const { cardId } = req.body;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Usuario no encontrado");
-    }
-    if (!user.favorites.includes(cardId)) {
-      user.favorites.push(cardId);
-      await user.save();
-    }
-    return res.status(HTTP_RESPONSES.OK).json(user.favorites);
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
 
-const removeFromFavorites = async (req, res, next) => {
-  try {
-    const userId = req.user._id;
-    const { cardId } = req.body;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Usuario no encontrado");
-    }
-    user.favorites = user.favorites.filter((id) => id.toString() !== cardId);
-    await user.save();
-    return res.status(HTTP_RESPONSES.OK).json(user.favorites);
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
 
 module.exports = {
   getCards,
@@ -488,8 +449,5 @@ module.exports = {
   deleteCard,
   addToCollection,
   removeFromCollection,
-  addToFavorites,
-  removeFromFavorites,
-
   mockCreateCard,
 };

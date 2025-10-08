@@ -143,7 +143,7 @@ const login = async (req, res) => {
 
     console.log("Usuario encontrado:", user ? user.username : "no encontrado");
     if (user) {
-      const match = await bcrypt.compare(password.trim(), user.password.trim());
+      const match = await bcrypt.compare(password.trim(), user.password);
       if (match) {
         const token = generarLlave(user._id);
         const userData = {
