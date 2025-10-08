@@ -330,10 +330,34 @@ const deleteUser = async (req, res) => {
         .json({ message: "Usuario no encontrado" });
     }
 
+    const Card = require("../models/card");
+    const Collection = require("../models/collection");
+    const Friendship = require("../models/friendship");
+    const Message = require("../models/message");
+
+    await Card.deleteMany({ creator: user.username });
+    await Card.deleteMany({ creator: user.email });
+    
+    await Collection.deleteMany({ creator: id });
+    
+    await Friendship.deleteMany({
+      $or: [
+        { requester: id },
+        { recipient: id }
+      ]
+    });
+    
+    await Message.deleteMany({
+      $or: [
+        { sender: id },
+        { recipient: id }
+      ]
+    });
+
     await User.findByIdAndDelete(id);
     return res
       .status(HTTP_RESPONSES.OK)
-      .json({ message: "Perfil eliminado correctamente." });
+      .json({ message: "Perfil eliminado correctamente junto con todo su contenido." });
   } catch (error) {
     console.error("Error al eliminar el perfil:", error);
     return res

@@ -23,8 +23,9 @@ const collectionRouter = express.Router();
 collectionRouter.get("/", optionalAuth, getCollections);
 collectionRouter.get("/by/user/:userId", optionalAuth, getCollectionsByUser);
 collectionRouter.get("/mine", isAuth, getMyCollections);
-collectionRouter.get("/:id", optionalAuth, getCollectionById);
+collectionRouter.get("/favorites/mine", isAuth, getFavoriteCollections);
 collectionRouter.get("/get/:title", getCollectionByTitle);
+collectionRouter.get("/:id", optionalAuth, getCollectionById);
 collectionRouter.post(
   "/",
   isAuth,
@@ -42,7 +43,6 @@ collectionRouter.put("/:id/addCard", isAuth, addCardToCollection);
 collectionRouter.put("/:id/removeCard", isAuth, removeCardFromCollection);
 collectionRouter.post("/:id/favorite", isAuth, addFavoriteCollection);
 collectionRouter.delete("/:id/favorite", isAuth, removeFavoriteCollection);
-collectionRouter.get("/favorites/mine", isAuth, getFavoriteCollections);
 collectionRouter.get("/debug/:id", optionalAuth, debugCollection);
 
 module.exports = collectionRouter;

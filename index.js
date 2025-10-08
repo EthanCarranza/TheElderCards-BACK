@@ -6,6 +6,7 @@ const cardsRouter = require("./src/api/routes/cardRoute");
 const collectionRouter = require("./src/api/routes/collectionRoute");
 const factionsRouter = require("./src/api/routes/factionRoute");
 const cardInteractionRouter = require("./src/api/routes/cardInteractionRoute");
+const collectionInteractionRouter = require("./src/api/routes/collectionInteractionRoute");
 const friendshipRouter = require("./src/api/routes/friendshipRoute");
 const messageRouter = require("./src/api/routes/messageRoute");
 
@@ -29,6 +30,7 @@ app.use("/api/v1/cards", cardsRouter);
 app.use("/api/v1/collections", collectionRouter);
 app.use("/api/v1/factions", factionsRouter);
 app.use("/api/v1/card-interactions", cardInteractionRouter);
+app.use("/api/v1/collection-interactions", collectionInteractionRouter);
 app.use("/api/v1/friendships", friendshipRouter);
 app.use("/api/v1/messages", messageRouter);
 
