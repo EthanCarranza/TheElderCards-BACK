@@ -38,7 +38,9 @@ messageSchema.index({ createdAt: -1 });
 
 // Método estático para obtener conversación entre dos usuarios
 messageSchema.statics.getConversation = async function(userId1, userId2, page = 1, limit = 50) {
-  const messages = await this.find({
+  const { applySafePopulateMultiple } = require('../../utils/safePopulate');
+  
+  const query = this.find({
     $or: [
       { sender: userId1, recipient: userId2 },
       { sender: userId2, recipient: userId1 }
@@ -50,6 +52,7 @@ messageSchema.statics.getConversation = async function(userId1, userId2, page = 
   .limit(limit * 1)
   .skip((page - 1) * limit);
 
+  const messages = await applySafePopulateMultiple(query);
   return messages.reverse(); // Ordenar cronológicamente para mostrar
 };
 

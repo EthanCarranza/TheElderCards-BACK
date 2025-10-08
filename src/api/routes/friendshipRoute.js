@@ -9,7 +9,8 @@ const {
   removeFriendship,
   blockUser,
   unblockUser,
-  searchUsers
+  searchUsers,
+  cleanupOrphanedFriendships
 } = require("../controllers/friendshipController");
 const { isAuth } = require("../../middlewares/auth");
 
@@ -39,5 +40,7 @@ router.post("/block/:userId", isAuth, blockUser);
 
 // Desbloquear usuario
 router.delete("/block/:userId", isAuth, unblockUser);
+
+router.post("/cleanup", isAuth, cleanupOrphanedFriendships);
 
 module.exports = router;

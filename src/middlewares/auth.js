@@ -77,4 +77,28 @@ const isAdmin = async (req, res, next) => {
   }
 };
 
-module.exports = { isAuth, isAdmin };
+const optionalAuth = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization;
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+    const parsedToken = token.replace("Bearer ", "");
+    const { id } = verificarLlave(parsedToken);
+    const user = await User.findById(id);
+    if (!user) {
+      req.user = null;
+      return next();
+    }
+    user.password = null;
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Error en autenticación opcional:", error);
+    req.user = null;
+    next();
+  }
+};
+
+module.exports = { isAuth, isAdmin, optionalAuth };

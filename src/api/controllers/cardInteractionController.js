@@ -137,17 +137,29 @@ const getUserFavoriteCards = async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const favoriteInteractions = await CardInteraction.find({
-      userId,
-      favorited: true,
-    })
-      .populate({
-        path: "cardId",
-        populate: { path: "faction" },
+    let favoriteInteractions;
+    try {
+      favoriteInteractions = await CardInteraction.find({
+        userId,
+        favorited: true,
       })
-      .sort({ favoritedAt: -1 })
-      .skip(skip)
-      .limit(limit);
+        .populate({
+          path: "cardId",
+          populate: { path: "faction" },
+        })
+        .sort({ favoritedAt: -1 })
+        .skip(skip)
+        .limit(limit);
+    } catch (error) {
+      console.warn('Populate failed in getUserFavoriteCards:', error.message);
+      favoriteInteractions = await CardInteraction.find({
+        userId,
+        favorited: true,
+      })
+        .sort({ favoritedAt: -1 })
+        .skip(skip)
+        .limit(limit);
+    }
 
     const cards = favoriteInteractions.map((interaction) => interaction.cardId);
     const total = await CardInteraction.countDocuments({

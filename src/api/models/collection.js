@@ -6,6 +6,7 @@ const collectionSchema = new mongoose.Schema(
     description: { type: String, required: false, trim: true },
     img: { type: String, trim: true, required: false },
     creator: { type: String, required: true },
+    isPrivate: { type: Boolean, default: false },
     cards: [
       {
         type: mongoose.Schema.Types.ObjectId,

@@ -44,7 +44,16 @@ const sendFriendRequest = async (req, res) => {
     });
 
     await friendship.save();
-    await friendship.populate("recipient", "username email image");
+    
+    try {
+      await friendship.populate("recipient", "username email image");
+    } catch (error) {
+      console.warn('Recipient populate failed in sendFriendRequest:', error.message);
+      const { DELETED_USER_PLACEHOLDER } = require('../../utils/safePopulate');
+      if (!friendship.recipient || (typeof friendship.recipient === 'object' && !friendship.recipient.username)) {
+        friendship.recipient = DELETED_USER_PLACEHOLDER;
+      }
+    }
 
     return res.status(HTTP_RESPONSES.CREATED).json({
       message: "Solicitud de amistad enviada",
@@ -94,7 +103,16 @@ const respondFriendRequest = async (req, res) => {
     }
 
     await friendship.save();
-    await friendship.populate("requester", "username email image");
+    
+    try {
+      await friendship.populate("requester", "username email image");
+    } catch (error) {
+      console.warn('Requester populate failed in respondFriendRequest:', error.message);
+      const { DELETED_USER_PLACEHOLDER } = require('../../utils/safePopulate');
+      if (!friendship.requester || (typeof friendship.requester === 'object' && !friendship.requester.username)) {
+        friendship.requester = DELETED_USER_PLACEHOLDER;
+      }
+    }
 
     const message =
       action === "accept"
@@ -377,6 +395,22 @@ const searchUsers = async (req, res) => {
   }
 };
 
+const cleanupOrphanedFriendships = async (req, res) => {
+  try {
+    const cleanedCount = await Friendship.cleanupOrphanedFriendships();
+    
+    return res.status(HTTP_RESPONSES.OK).json({
+      message: `Limpieza completada: ${cleanedCount} amistades huérfanas eliminadas`,
+      cleanedCount
+    });
+  } catch (error) {
+    console.error("Error en limpieza de amistades:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
 module.exports = {
   sendFriendRequest,
   respondFriendRequest,
@@ -387,4 +421,5 @@ module.exports = {
   blockUser,
   unblockUser,
   searchUsers,
+  cleanupOrphanedFriendships,
 };

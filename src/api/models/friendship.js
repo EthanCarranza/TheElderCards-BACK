@@ -48,32 +48,42 @@ friendshipSchema.pre('save', function(next) {
 });
 
 // Método estático para encontrar amigos de un usuario
-friendshipSchema.statics.getFriends = function(userId) {
-  return this.find({
+friendshipSchema.statics.getFriends = async function(userId) {
+  const { applySafePopulateMultiple } = require('../../utils/safePopulate');
+  
+  const query = this.find({
     $or: [
       { requester: userId, status: 'accepted' },
       { recipient: userId, status: 'accepted' }
     ]
   }).populate('requester', 'username email image')
     .populate('recipient', 'username email image');
+  
+  return await applySafePopulateMultiple(query);
 };
 
 // Método estático para encontrar solicitudes pendientes recibidas
-friendshipSchema.statics.getPendingRequests = function(userId) {
-  return this.find({
+friendshipSchema.statics.getPendingRequests = async function(userId) {
+  const { applySafePopulate, safePopulateUser } = require('../../utils/safePopulate');
+  
+  const query = this.find({
     recipient: userId,
     status: 'pending'
-  }).populate('requester', 'username email image')
-    .sort({ createdAt: -1 });
+  }).sort({ createdAt: -1 });
+  
+  return await applySafePopulate(query, safePopulateUser('requester', 'username email image'));
 };
 
 // Método estático para encontrar solicitudes pendientes enviadas
-friendshipSchema.statics.getSentRequests = function(userId) {
-  return this.find({
+friendshipSchema.statics.getSentRequests = async function(userId) {
+  const { applySafePopulate, safePopulateUser } = require('../../utils/safePopulate');
+  
+  const query = this.find({
     requester: userId,
     status: 'pending'
-  }).populate('recipient', 'username email image')
-    .sort({ createdAt: -1 });
+  }).sort({ createdAt: -1 });
+  
+  return await applySafePopulate(query, safePopulateUser('recipient', 'username email image'));
 };
 
 // Método estático para verificar si dos usuarios ya tienen una relación
@@ -108,6 +118,34 @@ friendshipSchema.methods.getStatusForUser = function(userId) {
       role: 'recipient',
       otherUser: this.requester
     };
+  }
+};
+
+friendshipSchema.statics.cleanupOrphanedFriendships = async function() {
+  try {
+    const User = mongoose.model('users');
+    
+    const friendships = await this.find({});
+    const orphanedFriendships = [];
+    
+    for (const friendship of friendships) {
+      const requesterExists = await User.findById(friendship.requester);
+      const recipientExists = await User.findById(friendship.recipient);
+      
+      if (!requesterExists || !recipientExists) {
+        orphanedFriendships.push(friendship._id);
+      }
+    }
+    
+    if (orphanedFriendships.length > 0) {
+      await this.deleteMany({ _id: { $in: orphanedFriendships } });
+      console.log(`Limpieza completada: ${orphanedFriendships.length} amistades huérfanas eliminadas`);
+    }
+    
+    return orphanedFriendships.length;
+  } catch (error) {
+    console.error('Error en limpieza de amistades huérfanas:', error);
+    throw error;
   }
 };
 
