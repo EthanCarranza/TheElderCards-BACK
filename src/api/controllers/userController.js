@@ -129,10 +129,19 @@ const login = async (req, res) => {
     if (!email || !password) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Email y/o contrasena faltantes" });
+        .json({ message: "Email/usuario y/o contrasena faltantes" });
     }
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail });
+    const normalizedInput = email.trim();
+    console.log("Buscando usuario con:", normalizedInput);
+    
+    const user = await User.findOne({
+      $or: [
+        { email: normalizedInput.toLowerCase() },
+        { username: { $regex: new RegExp(`^${normalizedInput}$`, 'i') } }
+      ]
+    });
+    
+    console.log("Usuario encontrado:", user ? user.username : "no encontrado");
     if (user) {
       const match = await bcrypt.compare(password.trim(), user.password.trim());
       if (match) {
@@ -148,12 +157,12 @@ const login = async (req, res) => {
       } else {
         return res
           .status(HTTP_RESPONSES.UNAUTHORIZED)
-          .json({ message: "Usuario y/o contrasena incorrectos" });
+          .json({ message: "Credenciales incorrectas" });
       }
     } else {
       return res
-        .status(HTTP_RESPONSES.NOT_FOUND)
-        .json({ message: "Usuario no existe" });
+        .status(HTTP_RESPONSES.UNAUTHORIZED)
+        .json({ message: "Credenciales incorrectas" });
     }
   } catch (error) {
     console.log(error);
