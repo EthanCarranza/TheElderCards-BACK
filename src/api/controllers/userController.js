@@ -4,7 +4,9 @@ const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const mongoose = require("mongoose");
 
-const DEFAULT_PROFILE_IMAGE = User.DEFAULT_PROFILE_IMAGE || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png";
+const DEFAULT_PROFILE_IMAGE =
+  User.DEFAULT_PROFILE_IMAGE ||
+  "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png";
 
 const sanitizeUser = (user) => {
   if (!user) return null;
@@ -83,11 +85,9 @@ const register = async (req, res) => {
   try {
     const { username, email, password } = req.body || {};
     if (!username || !email || !password) {
-      return res
-        .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({
-          message: "Nombre de usuario, email y/o contrasena faltantes",
-        });
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "Nombre de usuario, email y/o contrasena faltantes",
+      });
     }
 
     const trimmedUsername = username.trim();
@@ -191,7 +191,11 @@ const updateUser = async (req, res) => {
     }
 
     const updates = {};
-    if (typeof username === "string" && username.trim() && username.trim() !== existingUser.username) {
+    if (
+      typeof username === "string" &&
+      username.trim() &&
+      username.trim() !== existingUser.username
+    ) {
       const usernameInUse = await User.findOne({ username: username.trim() });
       if (usernameInUse && usernameInUse._id.toString() !== id) {
         return res
@@ -281,7 +285,10 @@ const updateImage = async (req, res) => {
     }
     return res
       .status(HTTP_RESPONSES.OK)
-      .json({ imageUrl: userUpdated.image || DEFAULT_PROFILE_IMAGE, user: sanitizeUser(userUpdated) });
+      .json({
+        imageUrl: userUpdated.image || DEFAULT_PROFILE_IMAGE,
+        user: sanitizeUser(userUpdated),
+      });
   } catch (error) {
     console.log(error);
     return res

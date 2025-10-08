@@ -9,10 +9,18 @@ const { generateFramedImage } = require("../../utils/cardGenerator");
 const getCards = async (req, res, next) => {
   try {
     console.log("Fetching cards with filters:", req.query);
-    const { page = 1, limit = 20, sort, user: userId, favorites, liked, mostLiked, ...filters } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      sort,
+      user: userId,
+      favorites,
+      liked,
+      mostLiked,
+      ...filters
+    } = req.query;
     const query = {};
-    
-    // Filtros básicos
+
     if (filters.type) query.type = filters.type;
     if (filters.faction) query.faction = filters.faction;
     if (filters.title) query.title = { $regex: filters.title, $options: "i" };
@@ -25,27 +33,29 @@ const getCards = async (req, res, next) => {
       if (filters.defense) query.defense = filters.defense;
     }
 
-    // Manejo de filtros especiales por interacciones
     let cardIds = null;
-    
+
     if (favorites === "true" && userId) {
       const favoriteInteractions = await CardInteraction.find({
         userId,
-        favorited: true
+        favorited: true,
       }).select("cardId");
-      cardIds = favoriteInteractions.map(interaction => interaction.cardId);
+      cardIds = favoriteInteractions.map((interaction) => interaction.cardId);
     }
-    
+
     if (liked === "true" && userId) {
       const likedInteractions = await CardInteraction.find({
         userId,
-        liked: true
+        liked: true,
       }).select("cardId");
-      const likedIds = likedInteractions.map(interaction => interaction.cardId);
-      
+      const likedIds = likedInteractions.map(
+        (interaction) => interaction.cardId
+      );
+
       if (cardIds) {
-        // Intersección si ya hay filtro de favoritos
-        cardIds = cardIds.filter(id => likedIds.some(likedId => likedId.toString() === id.toString()));
+        cardIds = cardIds.filter((id) =>
+          likedIds.some((likedId) => likedId.toString() === id.toString())
+        );
       } else {
         cardIds = likedIds;
       }
@@ -58,7 +68,6 @@ const getCards = async (req, res, next) => {
     let sortObj = {};
     if (sort) {
       if (sort === "most_liked") {
-        // Para ordenar por más likes, necesitamos una agregación
         const pipeline = [
           { $match: query },
           {
@@ -66,8 +75,8 @@ const getCards = async (req, res, next) => {
               from: "cardinteractions",
               localField: "_id",
               foreignField: "cardId",
-              as: "interactions"
-            }
+              as: "interactions",
+            },
           },
           {
             $addFields: {
@@ -75,15 +84,15 @@ const getCards = async (req, res, next) => {
                 $size: {
                   $filter: {
                     input: "$interactions",
-                    cond: { $eq: ["$$this.liked", true] }
-                  }
-                }
-              }
-            }
+                    cond: { $eq: ["$$this.liked", true] },
+                  },
+                },
+              },
+            },
           },
           { $sort: { likesCount: -1 } },
           { $skip: (parseInt(page) - 1) * parseInt(limit) },
-          { $limit: parseInt(limit) }
+          { $limit: parseInt(limit) },
         ];
 
         const cards = await Card.aggregate(pipeline);
@@ -229,7 +238,7 @@ const createCard = async (req, res, next) => {
     const normalizedCreator =
       typeof creatorName === "string" && creatorName.trim().length > 0
         ? creatorName.trim()
-        : String(creatorName || "Anonimo");
+        : String(creatorName || "Anónimo");
     const imgUrl = await generateFramedImage(
       req.file.path,
       title,
@@ -329,8 +338,7 @@ const deleteCard = async (req, res, next) => {
       return res.status(HTTP_RESPONSES.NOT_FOUND).json("Carta no encontrada");
     }
 
-    // Verificar permisos: el creador puede eliminar su carta, o admin puede eliminar cualquiera
-    const userCreator = req.user?.username || req.user?.email || "Anonimo";
+    const userCreator = req.user?.username || req.user?.email || "Anónimo";
     const isAdmin = req.user?.role === "admin";
     const isOwner = card.creator.toLowerCase() === userCreator.toLowerCase();
 

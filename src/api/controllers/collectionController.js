@@ -160,7 +160,6 @@ const removeCardFromCollection = async (req, res, next) => {
   }
 };
 
-// Secure wrappers enforcing ownership
 const addCardToCollectionSecure = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -168,20 +167,25 @@ const addCardToCollectionSecure = async (req, res, next) => {
     if (!id || !cardId) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Id de colecci��n o carta faltante");
+        .json("Id de colección o carta faltante");
     }
     const collection = await Collection.findById(id);
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colecci��n no encontrada");
+        .json("Colección no encontrada");
     }
-    if (!req.user || collection.creator.toString() !== req.user._id.toString()) {
+    if (
+      !req.user ||
+      collection.creator.toString() !== req.user._id.toString()
+    ) {
       return res
         .status(HTTP_RESPONSES.FORBIDDEN)
-        .json("No tienes permiso para modificar esta colecci��n");
+        .json("No tienes permiso para modificar esta colección");
     }
-    const alreadyIn = collection.cards.map((c) => c.toString()).includes(cardId);
+    const alreadyIn = collection.cards
+      .map((c) => c.toString())
+      .includes(cardId);
     if (alreadyIn) {
       return res
         .status(HTTP_RESPONSES.CONFLICT || 409)
@@ -190,7 +194,9 @@ const addCardToCollectionSecure = async (req, res, next) => {
     collection.cards.push(cardId);
     await collection.save();
     const payload =
-      typeof collection.toObject === "function" ? collection.toObject() : collection;
+      typeof collection.toObject === "function"
+        ? collection.toObject()
+        : collection;
     return res
       .status(HTTP_RESPONSES.OK)
       .json({ ...payload, _meta: { added: true } });
@@ -209,18 +215,21 @@ const removeCardFromCollectionSecure = async (req, res, next) => {
     if (!id || !cardId) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Id de colecci��n o carta faltante");
+        .json("Id de colección o carta faltante");
     }
     const collection = await Collection.findById(id);
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colecci��n no encontrada");
+        .json("Colección no encontrada");
     }
-    if (!req.user || collection.creator.toString() !== req.user._id.toString()) {
+    if (
+      !req.user ||
+      collection.creator.toString() !== req.user._id.toString()
+    ) {
       return res
         .status(HTTP_RESPONSES.FORBIDDEN)
-        .json("No tienes permiso para modificar esta colecci��n");
+        .json("No tienes permiso para modificar esta colección");
     }
     const wasIn = collection.cards.map((c) => c.toString()).includes(cardId);
     let removed = false;
@@ -232,7 +241,9 @@ const removeCardFromCollectionSecure = async (req, res, next) => {
       removed = true;
     }
     const payload =
-      typeof collection.toObject === "function" ? collection.toObject() : collection;
+      typeof collection.toObject === "function"
+        ? collection.toObject()
+        : collection;
     return res
       .status(HTTP_RESPONSES.OK)
       .json({ ...payload, _meta: { removed } });
@@ -284,7 +295,6 @@ module.exports = {
   removeCardFromCollection: removeCardFromCollectionSecure,
 };
 
-// Additional handlers and export mappings
 const getCollectionsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -293,7 +303,9 @@ const getCollectionsByUser = async (req, res) => {
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Id de usuario invalido" });
     }
-    const collections = await Collection.find({ creator: userId }).populate("cards");
+    const collections = await Collection.find({ creator: userId }).populate(
+      "cards"
+    );
     return res.status(HTTP_RESPONSES.OK).json(collections || []);
   } catch (error) {
     console.log(error);
@@ -310,7 +322,9 @@ const getMyCollections = async (req, res) => {
         .status(HTTP_RESPONSES.UNAUTHORIZED)
         .json({ message: "Token no proporcionado, acceso no autorizado" });
     }
-    const collections = await Collection.find({ creator: req.user._id.toString() }).populate("cards");
+    const collections = await Collection.find({
+      creator: req.user._id.toString(),
+    }).populate("cards");
     return res.status(HTTP_RESPONSES.OK).json(collections || []);
   } catch (error) {
     console.log(error);
@@ -327,17 +341,17 @@ const addFavoriteCollection = async (req, res) => {
         .status(HTTP_RESPONSES.UNAUTHORIZED)
         .json({ message: "Token no proporcionado, acceso no autorizado" });
     }
-    const { id } = req.params; // collection id
+    const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id de coleccion invalido" });
+        .json({ message: "Id de colección inválido" });
     }
     const exists = await Collection.findById(id);
     if (!exists) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json({ message: "Colecci��n no encontrada" });
+        .json({ message: "Colección no encontrada" });
     }
     const user = await User.findById(req.user._id);
     if (!user.favoriteCollections.map((c) => c.toString()).includes(id)) {
@@ -360,7 +374,7 @@ const removeFavoriteCollection = async (req, res) => {
         .status(HTTP_RESPONSES.UNAUTHORIZED)
         .json({ message: "Token no proporcionado, acceso no autorizado" });
     }
-    const { id } = req.params; // collection id
+    const { id } = req.params;
     const user = await User.findById(req.user._id);
     user.favoriteCollections = user.favoriteCollections.filter(
       (c) => c.toString() !== id
@@ -386,9 +400,7 @@ const getFavoriteCollections = async (req, res) => {
       path: "favoriteCollections",
       populate: { path: "cards" },
     });
-    return res
-      .status(HTTP_RESPONSES.OK)
-      .json(user?.favoriteCollections || []);
+    return res.status(HTTP_RESPONSES.OK).json(user?.favoriteCollections || []);
   } catch (error) {
     console.log(error);
     return res

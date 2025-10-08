@@ -130,13 +130,11 @@ const deleteFaction = async (req, res, next) => {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json("ID inválido");
     }
 
-    // Verificar si la facción existe
     const faction = await Faction.findById(id);
     if (!faction) {
       return res.status(HTTP_RESPONSES.NOT_FOUND).json("Facción no encontrada");
     }
 
-    // Verificar si hay cartas que usan esta facción
     const Card = require("../models/card");
     const cardsUsingFaction = await Card.countDocuments({ faction: id });
 
@@ -147,7 +145,6 @@ const deleteFaction = async (req, res, next) => {
       });
     }
 
-    // Si no hay cartas que la usen, eliminar la facción
     await Faction.findByIdAndDelete(id);
     return res
       .status(HTTP_RESPONSES.OK)
