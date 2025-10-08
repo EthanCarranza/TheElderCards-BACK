@@ -44,13 +44,20 @@ const sendFriendRequest = async (req, res) => {
     });
 
     await friendship.save();
-    
+
     try {
       await friendship.populate("recipient", "username email image");
     } catch (error) {
-      console.warn('Recipient populate failed in sendFriendRequest:', error.message);
-      const { DELETED_USER_PLACEHOLDER } = require('../../utils/safePopulate');
-      if (!friendship.recipient || (typeof friendship.recipient === 'object' && !friendship.recipient.username)) {
+      console.warn(
+        "Recipient populate failed in sendFriendRequest:",
+        error.message
+      );
+      const { DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
+      if (
+        !friendship.recipient ||
+        (typeof friendship.recipient === "object" &&
+          !friendship.recipient.username)
+      ) {
         friendship.recipient = DELETED_USER_PLACEHOLDER;
       }
     }
@@ -103,13 +110,20 @@ const respondFriendRequest = async (req, res) => {
     }
 
     await friendship.save();
-    
+
     try {
       await friendship.populate("requester", "username email image");
     } catch (error) {
-      console.warn('Requester populate failed in respondFriendRequest:', error.message);
-      const { DELETED_USER_PLACEHOLDER } = require('../../utils/safePopulate');
-      if (!friendship.requester || (typeof friendship.requester === 'object' && !friendship.requester.username)) {
+      console.warn(
+        "Requester populate failed in respondFriendRequest:",
+        error.message
+      );
+      const { DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
+      if (
+        !friendship.requester ||
+        (typeof friendship.requester === "object" &&
+          !friendship.requester.username)
+      ) {
         friendship.requester = DELETED_USER_PLACEHOLDER;
       }
     }
@@ -403,13 +417,42 @@ const searchUsers = async (req, res) => {
   }
 };
 
+const getBlockedUsers = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const blockedRelations = await Friendship.find({
+      requester: userId,
+      status: "blocked",
+    }).populate("recipient", "username email image");
+
+    const blockedUsers = blockedRelations.map((relation) => ({
+      _id: relation.recipient._id,
+      username: relation.recipient.username,
+      email: relation.recipient.email,
+      image: relation.recipient.image,
+      blockedAt: relation.updatedAt,
+    }));
+
+    return res.status(HTTP_RESPONSES.OK).json({
+      blockedUsers,
+      count: blockedUsers.length,
+    });
+  } catch (error) {
+    console.error("Error al obtener usuarios bloqueados:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
 const cleanupOrphanedFriendships = async (req, res) => {
   try {
     const cleanedCount = await Friendship.cleanupOrphanedFriendships();
-    
+
     return res.status(HTTP_RESPONSES.OK).json({
       message: `Limpieza completada: ${cleanedCount} amistades huérfanas eliminadas`,
-      cleanedCount
+      cleanedCount,
     });
   } catch (error) {
     console.error("Error en limpieza de amistades:", error);
@@ -428,6 +471,7 @@ module.exports = {
   removeFriendship,
   blockUser,
   unblockUser,
+  getBlockedUsers,
   searchUsers,
   cleanupOrphanedFriendships,
 };

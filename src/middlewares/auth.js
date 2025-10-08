@@ -1,6 +1,9 @@
 const User = require("../api/models/user");
 const { verificarLlave } = require("../utils/jwt");
-const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../api/models/httpResponses");
+const {
+  HTTP_RESPONSES,
+  HTTP_MESSAGES,
+} = require("../api/models/httpResponses");
 
 const isAuth = async (req, res, next) => {
   try {

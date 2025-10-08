@@ -2,66 +2,74 @@ const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Collection = require("../models/collection");
 const User = require("../models/user");
 const mongoose = require("mongoose");
-const { safePopulateUser, applySafePopulate, DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
+const {
+  safePopulateUser,
+  applySafePopulate,
+  DELETED_USER_PLACEHOLDER,
+} = require("../../utils/safePopulate");
 
 const isOwner = (creatorId, userId) => {
   if (!creatorId || !userId) return false;
-  
+
   const normalizeId = (id) => {
-    if (!id) return '';
-    if (typeof id === 'string') return id;
+    if (!id) return "";
+    if (typeof id === "string") return id;
     if (id.toString) return id.toString();
     if (id._id) return id._id.toString();
     return String(id);
   };
-  
+
   const creatorIdStr = normalizeId(creatorId);
   const userIdStr = normalizeId(userId);
-  
-  return creatorIdStr === userIdStr && creatorIdStr !== '';
+
+  return creatorIdStr === userIdStr && creatorIdStr !== "";
 };
 
 const getCollections = async (req, res, next) => {
   try {
-    const publicCollections = await Collection.find({ isPrivate: false })
-      .populate("cards");
-    
+    const publicCollections = await Collection.find({
+      isPrivate: false,
+    }).populate("cards");
+
     let collections = publicCollections;
-    
+
     if (req.user) {
       const userId = req.user._id ? req.user._id.toString() : req.user.id;
-      const privateCollections = await Collection.find({ 
-        creator: userId, 
-        isPrivate: true 
-      })
-        .populate("cards");
-      
+      const privateCollections = await Collection.find({
+        creator: userId,
+        isPrivate: true,
+      }).populate("cards");
+
       collections = [...collections, ...privateCollections];
     }
-    
-    const processedCollections = await Promise.all(collections.map(async (collection) => {
-      const processed = collection.toObject();
-      
-      try {
-        const User = require("../models/user");
-        const creator = await User.findById(processed.creator).select("username email");
-        
-        if (creator) {
-          processed.creator = {
-            _id: creator._id,
-            username: creator.username,
-            email: creator.email
-          };
-        } else {
+
+    const processedCollections = await Promise.all(
+      collections.map(async (collection) => {
+        const processed = collection.toObject();
+
+        try {
+          const User = require("../models/user");
+          const creator = await User.findById(processed.creator).select(
+            "username email"
+          );
+
+          if (creator) {
+            processed.creator = {
+              _id: creator._id,
+              username: creator.username,
+              email: creator.email,
+            };
+          } else {
+            processed.creator = DELETED_USER_PLACEHOLDER;
+          }
+        } catch (error) {
           processed.creator = DELETED_USER_PLACEHOLDER;
         }
-      } catch (error) {
-        processed.creator = DELETED_USER_PLACEHOLDER;
-      }
-      
-      return processed;
-    }));
-    
+
+        return processed;
+      })
+    );
+
     return res.status(HTTP_RESPONSES.OK).json(processedCollections);
   } catch (error) {
     console.log(error);
@@ -85,20 +93,23 @@ const getCollectionById = async (req, res, next) => {
         .status(HTTP_RESPONSES.NOT_FOUND)
         .json("Colección no encontrada");
     }
-    
+
     const creatorId = collection.creator; // Este es el ID original como string
-    
-    if (collection.isPrivate && (!req.user || !isOwner(creatorId, req.user._id))) {
+
+    if (
+      collection.isPrivate &&
+      (!req.user || !isOwner(creatorId, req.user._id))
+    ) {
       return res
         .status(HTTP_RESPONSES.FORBIDDEN)
         .json("No tienes permiso para ver esta colección privada");
     }
-    
+
     const populatedCollection = await applySafePopulate(
-      Collection.findById(id).populate("cards"), 
+      Collection.findById(id).populate("cards"),
       safePopulateUser("creator", "username email")
     );
-    
+
     return res.status(HTTP_RESPONSES.OK).json(populatedCollection);
   } catch (error) {
     console.log(error);
@@ -115,10 +126,10 @@ const getCollectionByTitle = async (req, res, next) => {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json("Titulo faltante");
     }
     let collection = await Collection.findOne({ title }).populate("cards");
-    
+
     if (collection) {
       collection = await applySafePopulate(
-        Collection.findById(collection._id).populate("cards"), 
+        Collection.findById(collection._id).populate("cards"),
         safePopulateUser("creator", "username email")
       );
     }
@@ -351,9 +362,9 @@ const updateCollection = async (req, res, next) => {
 
     const updates = {};
     if (title && title.trim()) {
-      const existingCollection = await Collection.findOne({ 
-        title: title.trim(), 
-        _id: { $ne: id } 
+      const existingCollection = await Collection.findOne({
+        title: title.trim(),
+        _id: { $ne: id },
       });
       if (existingCollection) {
         return res
@@ -362,12 +373,12 @@ const updateCollection = async (req, res, next) => {
       }
       updates.title = title.trim();
     }
-    
+
     if (description !== undefined) {
       updates.description = description.trim();
     }
-    
-    if (typeof isPrivate === 'boolean') {
+
+    if (typeof isPrivate === "boolean") {
       updates.isPrivate = isPrivate;
     }
 
@@ -375,22 +386,23 @@ const updateCollection = async (req, res, next) => {
       updates.img = req.file.path;
     }
 
-    const updatedCollection = await Collection.findByIdAndUpdate(
-      id,
-      updates,
-      { new: true, runValidators: true }
-    ).populate("cards");
+    const updatedCollection = await Collection.findByIdAndUpdate(id, updates, {
+      new: true,
+      runValidators: true,
+    }).populate("cards");
 
     const processedCollection = updatedCollection.toObject();
     try {
       const User = require("../models/user");
-      const creator = await User.findById(processedCollection.creator).select("username email");
-      
+      const creator = await User.findById(processedCollection.creator).select(
+        "username email"
+      );
+
       if (creator) {
         processedCollection.creator = {
           _id: creator._id,
           username: creator.username,
-          email: creator.email
+          email: creator.email,
         };
       } else {
         processedCollection.creator = DELETED_USER_PLACEHOLDER;
@@ -457,14 +469,23 @@ const getCollectionsByUser = async (req, res) => {
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Id de usuario invalido" });
     }
-    
+
     let collections;
     if (req.user && isOwner(userId, req.user._id)) {
       const allQuery = Collection.find({ creator: userId }).populate("cards");
-      collections = await applySafePopulate(allQuery, safePopulateUser("creator", "username email"));
+      collections = await applySafePopulate(
+        allQuery,
+        safePopulateUser("creator", "username email")
+      );
     } else {
-      const publicQuery = Collection.find({ creator: userId, isPrivate: false }).populate("cards");
-      collections = await applySafePopulate(publicQuery, safePopulateUser("creator", "username email"));
+      const publicQuery = Collection.find({
+        creator: userId,
+        isPrivate: false,
+      }).populate("cards");
+      collections = await applySafePopulate(
+        publicQuery,
+        safePopulateUser("creator", "username email")
+      );
     }
     return res.status(HTTP_RESPONSES.OK).json(collections || []);
   } catch (error) {
@@ -574,26 +595,30 @@ const debugCollection = async (req, res) => {
     const { id } = req.params;
     const collection = await Collection.findById(id).populate({
       path: "creator",
-      select: "username email _id"
+      select: "username email _id",
     });
-    
+
     if (!collection) {
       return res.status(404).json({ error: "Collection not found" });
     }
-    
+
     return res.status(200).json({
       collection: {
         _id: collection._id,
         title: collection.title,
         isPrivate: collection.isPrivate,
-        creator: collection.creator
+        creator: collection.creator,
       },
-      currentUser: req.user ? {
-        _id: req.user._id,
-        username: req.user.username,
-        email: req.user.email
-      } : null,
-      ownershipCheck: req.user ? isOwner(collection.creator._id, req.user._id) : false
+      currentUser: req.user
+        ? {
+            _id: req.user._id,
+            username: req.user.username,
+            email: req.user.email,
+          }
+        : null,
+      ownershipCheck: req.user
+        ? isOwner(collection.creator._id, req.user._id)
+        : false,
     });
   } catch (error) {
     console.error("Debug error:", error);

@@ -4,31 +4,31 @@ const messageSchema = new mongoose.Schema({
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "users",
-    required: true
+    required: true,
   },
   recipient: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "users",
-    required: true
+    required: true,
   },
   content: {
     type: String,
     required: true,
     trim: true,
-    maxLength: 2000
+    maxLength: 2000,
   },
   readAt: {
     type: Date,
-    default: null
+    default: null,
   },
   isRead: {
     type: Boolean,
-    default: false
+    default: false,
   },
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Índices para mejorar rendimiento de consultas
@@ -37,36 +37,41 @@ messageSchema.index({ recipient: 1, isRead: 1 });
 messageSchema.index({ createdAt: -1 });
 
 // Método estático para obtener conversación entre dos usuarios
-messageSchema.statics.getConversation = async function(userId1, userId2, page = 1, limit = 50) {
-  const { applySafePopulateMultiple } = require('../../utils/safePopulate');
-  
+messageSchema.statics.getConversation = async function (
+  userId1,
+  userId2,
+  page = 1,
+  limit = 50
+) {
+  const { applySafePopulateMultiple } = require("../../utils/safePopulate");
+
   const query = this.find({
     $or: [
       { sender: userId1, recipient: userId2 },
-      { sender: userId2, recipient: userId1 }
-    ]
+      { sender: userId2, recipient: userId1 },
+    ],
   })
-  .populate('sender', 'username email image')
-  .populate('recipient', 'username email image')
-  .sort({ createdAt: -1 })
-  .limit(limit * 1)
-  .skip((page - 1) * limit);
+    .populate("sender", "username email image")
+    .populate("recipient", "username email image")
+    .sort({ createdAt: -1 })
+    .limit(limit * 1)
+    .skip((page - 1) * limit);
 
   const messages = await applySafePopulateMultiple(query);
   return messages.reverse(); // Ordenar cronológicamente para mostrar
 };
 
 // Método estático para obtener conversaciones del usuario con los últimos mensajes
-messageSchema.statics.getUserConversations = async function(userId) {
+messageSchema.statics.getUserConversations = async function (userId) {
   const conversations = await this.aggregate([
     // Buscar todos los mensajes donde el usuario es sender o recipient
     {
       $match: {
         $or: [
           { sender: new mongoose.Types.ObjectId(userId) },
-          { recipient: new mongoose.Types.ObjectId(userId) }
-        ]
-      }
+          { recipient: new mongoose.Types.ObjectId(userId) },
+        ],
+      },
     },
     // Determinar el "otro" usuario en la conversación
     {
@@ -75,10 +80,10 @@ messageSchema.statics.getUserConversations = async function(userId) {
           $cond: {
             if: { $eq: ["$sender", new mongoose.Types.ObjectId(userId)] },
             then: "$recipient",
-            else: "$sender"
-          }
-        }
-      }
+            else: "$sender",
+          },
+        },
+      },
     },
     // Agrupar por el otro usuario
     {
@@ -88,22 +93,22 @@ messageSchema.statics.getUserConversations = async function(userId) {
         unreadCount: {
           $sum: {
             $cond: {
-              if: { 
+              if: {
                 $and: [
                   { $eq: ["$recipient", new mongoose.Types.ObjectId(userId)] },
-                  { $eq: ["$isRead", false] }
-                ]
+                  { $eq: ["$isRead", false] },
+                ],
               },
               then: 1,
-              else: 0
-            }
-          }
-        }
-      }
+              else: 0,
+            },
+          },
+        },
+      },
     },
     // Ordenar por fecha del último mensaje
     {
-      $sort: { "lastMessage.createdAt": -1 }
+      $sort: { "lastMessage.createdAt": -1 },
     },
     // Poblar información del otro usuario
     {
@@ -111,11 +116,11 @@ messageSchema.statics.getUserConversations = async function(userId) {
         from: "users",
         localField: "_id",
         foreignField: "_id",
-        as: "user"
-      }
+        as: "user",
+      },
     },
     {
-      $unwind: "$user"
+      $unwind: "$user",
     },
     // Proyectar solo los campos necesarios
     {
@@ -126,36 +131,36 @@ messageSchema.statics.getUserConversations = async function(userId) {
           _id: "$user._id",
           username: "$user.username",
           email: "$user.email",
-          image: "$user.image"
+          image: "$user.image",
         },
         lastMessage: {
           _id: "$lastMessage._id",
           content: "$lastMessage.content",
           createdAt: "$lastMessage.createdAt",
           sender: "$lastMessage.sender",
-          isRead: "$lastMessage.isRead"
+          isRead: "$lastMessage.isRead",
         },
-        unreadCount: 1
-      }
-    }
+        unreadCount: 1,
+      },
+    },
   ]);
 
   return conversations;
 };
 
 // Método estático para marcar mensajes como leídos
-messageSchema.statics.markAsRead = async function(senderId, recipientId) {
+messageSchema.statics.markAsRead = async function (senderId, recipientId) {
   const result = await this.updateMany(
     {
       sender: senderId,
       recipient: recipientId,
-      isRead: false
+      isRead: false,
     },
     {
       $set: {
         isRead: true,
-        readAt: new Date()
-      }
+        readAt: new Date(),
+      },
     }
   );
 
@@ -163,10 +168,10 @@ messageSchema.statics.markAsRead = async function(senderId, recipientId) {
 };
 
 // Método estático para obtener el conteo de mensajes no leídos
-messageSchema.statics.getUnreadCount = async function(userId) {
+messageSchema.statics.getUnreadCount = async function (userId) {
   const count = await this.countDocuments({
     recipient: userId,
-    isRead: false
+    isRead: false,
   });
 
   return count;

@@ -52,17 +52,23 @@ const sendMessage = async (req, res) => {
     });
 
     await message.save();
-    
+
     try {
       await message.populate("sender", "username email image");
       await message.populate("recipient", "username email image");
     } catch (error) {
-      console.warn('User populate failed in sendMessage:', error.message);
-      const { DELETED_USER_PLACEHOLDER } = require('../../utils/safePopulate');
-      if (!message.sender || (typeof message.sender === 'object' && !message.sender.username)) {
+      console.warn("User populate failed in sendMessage:", error.message);
+      const { DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
+      if (
+        !message.sender ||
+        (typeof message.sender === "object" && !message.sender.username)
+      ) {
         message.sender = DELETED_USER_PLACEHOLDER;
       }
-      if (!message.recipient || (typeof message.recipient === 'object' && !message.recipient.username)) {
+      if (
+        !message.recipient ||
+        (typeof message.recipient === "object" && !message.recipient.username)
+      ) {
         message.recipient = DELETED_USER_PLACEHOLDER;
       }
     }

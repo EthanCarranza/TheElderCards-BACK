@@ -133,14 +133,14 @@ const login = async (req, res) => {
     }
     const normalizedInput = email.trim();
     console.log("Buscando usuario con:", normalizedInput);
-    
+
     const user = await User.findOne({
       $or: [
         { email: normalizedInput.toLowerCase() },
-        { username: { $regex: new RegExp(`^${normalizedInput}$`, 'i') } }
-      ]
+        { username: { $regex: new RegExp(`^${normalizedInput}$`, "i") } },
+      ],
     });
-    
+
     console.log("Usuario encontrado:", user ? user.username : "no encontrado");
     if (user) {
       const match = await bcrypt.compare(password.trim(), user.password.trim());
@@ -292,12 +292,10 @@ const updateImage = async (req, res) => {
         .status(HTTP_RESPONSES.NOT_FOUND)
         .json({ message: "Usuario no encontrado" });
     }
-    return res
-      .status(HTTP_RESPONSES.OK)
-      .json({
-        imageUrl: userUpdated.image || DEFAULT_PROFILE_IMAGE,
-        user: sanitizeUser(userUpdated),
-      });
+    return res.status(HTTP_RESPONSES.OK).json({
+      imageUrl: userUpdated.image || DEFAULT_PROFILE_IMAGE,
+      user: sanitizeUser(userUpdated),
+    });
   } catch (error) {
     console.log(error);
     return res

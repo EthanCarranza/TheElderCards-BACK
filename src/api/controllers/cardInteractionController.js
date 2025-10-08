@@ -151,7 +151,7 @@ const getUserFavoriteCards = async (req, res) => {
         .skip(skip)
         .limit(limit);
     } catch (error) {
-      console.warn('Populate failed in getUserFavoriteCards:', error.message);
+      console.warn("Populate failed in getUserFavoriteCards:", error.message);
       favoriteInteractions = await CardInteraction.find({
         userId,
         favorited: true,

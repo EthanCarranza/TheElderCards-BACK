@@ -42,109 +42,124 @@ const friendshipSchema = new mongoose.Schema({
 friendshipSchema.index({ requester: 1, recipient: 1 }, { unique: true });
 
 // Middleware para actualizar el timestamp automáticamente
-friendshipSchema.pre('save', function(next) {
+friendshipSchema.pre("save", function (next) {
   this.updatedAt = new Date();
   next();
 });
 
 // Método estático para encontrar amigos de un usuario
-friendshipSchema.statics.getFriends = async function(userId) {
-  const { applySafePopulateMultiple } = require('../../utils/safePopulate');
-  
+friendshipSchema.statics.getFriends = async function (userId) {
+  const { applySafePopulateMultiple } = require("../../utils/safePopulate");
+
   const query = this.find({
     $or: [
-      { requester: userId, status: 'accepted' },
-      { recipient: userId, status: 'accepted' }
-    ]
-  }).populate('requester', 'username email image')
-    .populate('recipient', 'username email image');
-  
+      { requester: userId, status: "accepted" },
+      { recipient: userId, status: "accepted" },
+    ],
+  })
+    .populate("requester", "username email image")
+    .populate("recipient", "username email image");
+
   return await applySafePopulateMultiple(query);
 };
 
 // Método estático para encontrar solicitudes pendientes recibidas
-friendshipSchema.statics.getPendingRequests = async function(userId) {
-  const { applySafePopulate, safePopulateUser } = require('../../utils/safePopulate');
-  
+friendshipSchema.statics.getPendingRequests = async function (userId) {
+  const {
+    applySafePopulate,
+    safePopulateUser,
+  } = require("../../utils/safePopulate");
+
   const query = this.find({
     recipient: userId,
-    status: 'pending'
+    status: "pending",
   }).sort({ createdAt: -1 });
-  
-  return await applySafePopulate(query, safePopulateUser('requester', 'username email image'));
+
+  return await applySafePopulate(
+    query,
+    safePopulateUser("requester", "username email image")
+  );
 };
 
 // Método estático para encontrar solicitudes pendientes enviadas
-friendshipSchema.statics.getSentRequests = async function(userId) {
-  const { applySafePopulate, safePopulateUser } = require('../../utils/safePopulate');
-  
+friendshipSchema.statics.getSentRequests = async function (userId) {
+  const {
+    applySafePopulate,
+    safePopulateUser,
+  } = require("../../utils/safePopulate");
+
   const query = this.find({
     requester: userId,
-    status: 'pending'
+    status: "pending",
   }).sort({ createdAt: -1 });
-  
-  return await applySafePopulate(query, safePopulateUser('recipient', 'username email image'));
+
+  return await applySafePopulate(
+    query,
+    safePopulateUser("recipient", "username email image")
+  );
 };
 
 // Método estático para verificar si dos usuarios ya tienen una relación
-friendshipSchema.statics.getRelationship = function(userId1, userId2) {
+friendshipSchema.statics.getRelationship = function (userId1, userId2) {
   return this.findOne({
     $or: [
       { requester: userId1, recipient: userId2 },
-      { requester: userId2, recipient: userId1 }
-    ]
+      { requester: userId2, recipient: userId1 },
+    ],
   });
 };
 
 // Método estático para verificar si dos usuarios son amigos
-friendshipSchema.statics.areFriends = async function(userId1, userId2) {
+friendshipSchema.statics.areFriends = async function (userId1, userId2) {
   const relationship = await this.getRelationship(userId1, userId2);
-  return relationship && relationship.status === 'accepted';
+  return relationship && relationship.status === "accepted";
 };
 
 // Método para obtener el estado de la relación desde la perspectiva de un usuario
-friendshipSchema.methods.getStatusForUser = function(userId) {
+friendshipSchema.methods.getStatusForUser = function (userId) {
   if (this.requester.toString() === userId.toString()) {
     // El usuario es quien envió la solicitud
     return {
       status: this.status,
-      role: 'requester',
-      otherUser: this.recipient
+      role: "requester",
+      otherUser: this.recipient,
     };
   } else {
     // El usuario es quien recibió la solicitud
     return {
       status: this.status,
-      role: 'recipient',
-      otherUser: this.requester
+      role: "recipient",
+      otherUser: this.requester,
     };
   }
 };
 
-friendshipSchema.statics.cleanupOrphanedFriendships = async function() {
+friendshipSchema.statics.cleanupOrphanedFriendships = async function () {
   try {
-    const User = mongoose.model('users');
-    
+    const User = mongoose.model("users");
+
     const friendships = await this.find({});
     const orphanedFriendships = [];
-    
+
     for (const friendship of friendships) {
       const requesterExists = await User.findById(friendship.requester);
       const recipientExists = await User.findById(friendship.recipient);
-      
+
       if (!requesterExists || !recipientExists) {
         orphanedFriendships.push(friendship._id);
       }
     }
-    
+
     if (orphanedFriendships.length > 0) {
       await this.deleteMany({ _id: { $in: orphanedFriendships } });
-      console.log(`Limpieza completada: ${orphanedFriendships.length} amistades huérfanas eliminadas`);
+      console.log(
+        `Limpieza completada: ${orphanedFriendships.length} amistades huérfanas eliminadas`
+      );
     }
-    
+
     return orphanedFriendships.length;
   } catch (error) {
-    console.error('Error en limpieza de amistades huérfanas:', error);
+    console.error("Error en limpieza de amistades huérfanas:", error);
     throw error;
   }
 };

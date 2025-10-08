@@ -285,13 +285,13 @@ const createCard = async (req, res, next) => {
     }
 
     const savedCard = await Card.create(cardData);
-    
+
     try {
       await savedCard.populate("faction");
     } catch (error) {
-      console.warn('Faction populate failed:', error.message);
+      console.warn("Faction populate failed:", error.message);
     }
-    
+
     return res.status(HTTP_RESPONSES.CREATED).json(savedCard);
   } catch (error) {
     console.log(error);
