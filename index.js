@@ -32,6 +32,35 @@ app.use("/api/v1/card-interactions", cardInteractionRouter);
 app.use("/api/v1/friendships", friendshipRouter);
 app.use("/api/v1/messages", messageRouter);
 
+// Health check endpoint
+app.get("/api/health", async (req, res) => {
+  try {
+    const mongoose = require("mongoose");
+    const Card = require("./src/api/models/card");
+    const Faction = require("./src/api/models/faction");
+    
+    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+    const cardCount = await Card.countDocuments();
+    const factionCount = await Faction.countDocuments();
+    
+    res.json({
+      status: "OK",
+      database: dbStatus,
+      collections: {
+        cards: cardCount,
+        factions: factionCount
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "ERROR",
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.use("*", (req, res, next) => {
   return res.status(404).json("Route Not Found");
 });
