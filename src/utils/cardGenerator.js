@@ -5,10 +5,7 @@ const path = require("path");
 const cloudinary = require("cloudinary").v2;
 
 const FONT_FAMILY = "Cyrodiil";
-const FONT_FILES = [
-  "Cyrodiil.otf",
-  "Cyrodiil-Bold.otf",
-];
+const FONT_FILES = ["Cyrodiil.otf", "Cyrodiil-Bold.otf"];
 
 let fontRegistered = false;
 const missingFontFiles = [];
@@ -29,7 +26,9 @@ for (const fontFile of FONT_FILES) {
 }
 
 if (missingFontFiles.length) {
-  console.warn(`Cyrodiil font files not found at: ${missingFontFiles.join(', ')}`);
+  console.warn(
+    `Cyrodiil font files not found at: ${missingFontFiles.join(", ")}`
+  );
 }
 
 if (!fontRegistered) {
@@ -338,17 +337,17 @@ async function generateFramedImage(
     );
     ctx.restore();
   }
-  // Guardar imagen temporalmente
-  const outputDir = path.join("output");
-  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
-  const outputPath = path.join(outputDir, `${Date.now()}.png`);
-  const pngBuffer = await canvas.encode("png");
-  await fs.promises.writeFile(outputPath, pngBuffer);
 
-  // Subir a Cloudinary usando la misma configuracion que el resto del backend
+  // Generar buffer de la imagen (sin guardar archivo local)
+  const pngBuffer = await canvas.encode("png");
+
+  // Subir directamente a Cloudinary desde el buffer
   let cloudinaryUrl = null;
   try {
-    const uploadResult = await cloudinary.uploader.upload(outputPath, {
+    // Convertir buffer a base64 para Cloudinary
+    const base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+
+    const uploadResult = await cloudinary.uploader.upload(base64Image, {
       folder: "Cards",
       resource_type: "image",
     });
@@ -357,17 +356,13 @@ async function generateFramedImage(
     console.error("Error subiendo a Cloudinary:", err);
     throw err;
   } finally {
+    // Solo intentar eliminar la imagen de entrada si no es remota
     try {
       if (!inputIsRemote && typeof inputImagePath === "string") {
         await fs.promises.unlink(inputImagePath);
       }
     } catch (unlinkErr) {
       console.warn("No se pudo eliminar la imagen de entrada:", unlinkErr);
-    }
-    try {
-      await fs.promises.unlink(outputPath);
-    } catch (unlinkErr) {
-      console.warn("No se pudo eliminar la imagen generada:", unlinkErr);
     }
   }
 

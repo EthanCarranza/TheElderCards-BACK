@@ -5,6 +5,7 @@ const Faction = require("../models/faction");
 const Collection = require("../models/collection");
 const CardInteraction = require("../models/cardInteraction");
 const { generateFramedImage } = require("../../utils/cardGenerator");
+const fs = require("fs");
 
 const getCards = async (req, res, next) => {
   try {
@@ -248,8 +249,8 @@ const createCard = async (req, res, next) => {
         ? creatorName.trim()
         : String(creatorName || "Anónimo");
     console.log("[createCard] Iniciando generación de imagen...");
-    let imgUrl;
     
+    let imgUrl;
     try {
       imgUrl = await generateFramedImage(
         req.file.path,
@@ -264,17 +265,32 @@ const createCard = async (req, res, next) => {
       );
       console.log("[createCard] Imagen generada exitosamente:", imgUrl);
     } catch (imageError) {
-      console.log("[createCard] ERROR en generación de imagen:", imageError);
-      // Fallback: usar la imagen original subida
-      imgUrl = req.file.path;
-      console.log("[createCard] Usando imagen original como fallback:", imgUrl);
+      console.error("[createCard] ERROR en generación de imagen:", imageError);
+      
+      // Eliminar la imagen subida si falló la generación
+      try {
+        await fs.promises.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.warn("[createCard] No se pudo eliminar imagen subida:", unlinkError);
+      }
+      
+      return res
+        .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+        .json({ 
+          message: "Error al generar la imagen de la carta", 
+          error: imageError.message,
+          details: "La imagen no pudo ser procesada correctamente. Verifica que el formato sea válido e inténtalo de nuevo."
+        });
     }
 
     if (!imgUrl) {
-      console.log("[createCard] ERROR: No se pudo obtener URL de imagen");
+      console.log("[createCard] ERROR: No se obtuvo URL de imagen válida");
       return res
         .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-        .json({ message: "No se pudo generar la imagen de la carta" });
+        .json({ 
+          message: "No se pudo generar la imagen de la carta",
+          details: "El proceso de generación no devolvió una URL válida."
+        });
     }
 
     const normalizedTitle =

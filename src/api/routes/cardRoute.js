@@ -13,11 +13,13 @@ const {
   addToFavorites,
   removeFromFavorites,
   testCreateCard,
+  diagnosticCardGeneration,
 } = require("../controllers/cardController");
 const router = express.Router();
 
 router.get("/", getCards);
 router.get("/all", getAllCards);
+router.get("/diagnostic", diagnosticCardGeneration);
 router.get("/:id", getCardById);
 router.post("/test", testCreateCard);
 router.post("/", isAuth, uploadCard.single("img"), createCard);
