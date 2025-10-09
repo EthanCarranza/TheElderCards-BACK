@@ -1,5 +1,6 @@
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Card = require("../models/card");
+const User = require("../models/user");
 const Faction = require("../models/faction");
 const Collection = require("../models/collection");
 const CardInteraction = require("../models/cardInteraction");
@@ -150,8 +151,11 @@ const getAllCards = async (req, res, next) => {
 
 const createCard = async (req, res, next) => {
   try {
+    console.log("[createCard] INICIO DE FUNCIÓN");
     console.log("[createCard] req.body:", req.body);
     console.log("[createCard] req.file:", req.file);
+    console.log("[createCard] req.user:", req.user);
+    
     const {
       title,
       date,
@@ -164,7 +168,12 @@ const createCard = async (req, res, next) => {
       defense,
     } = req.body;
 
+    console.log("[createCard] Datos extraídos:", {
+      title, description, type, faction, cost, attack, defense
+    });
+
     if (!title || !description || !type || !faction || !cost) {
+      console.log("[createCard] ERROR: Faltan datos obligatorios");
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Faltan datos obligatorios" });
@@ -238,19 +247,31 @@ const createCard = async (req, res, next) => {
       typeof creatorName === "string" && creatorName.trim().length > 0
         ? creatorName.trim()
         : String(creatorName || "Anónimo");
-    const imgUrl = await generateFramedImage(
-      req.file.path,
-      title,
-      type,
-      parsedCost,
-      description,
-      frameColor,
-      normalizedCreator,
-      type === "Creature" ? parsedAttack : undefined,
-      type === "Creature" ? parsedDefense : undefined
-    );
+    console.log("[createCard] Iniciando generación de imagen...");
+    let imgUrl;
+    
+    try {
+      imgUrl = await generateFramedImage(
+        req.file.path,
+        title,
+        type,
+        parsedCost,
+        description,
+        frameColor,
+        normalizedCreator,
+        type === "Creature" ? parsedAttack : undefined,
+        type === "Creature" ? parsedDefense : undefined
+      );
+      console.log("[createCard] Imagen generada exitosamente:", imgUrl);
+    } catch (imageError) {
+      console.log("[createCard] ERROR en generación de imagen:", imageError);
+      // Fallback: usar la imagen original subida
+      imgUrl = req.file.path;
+      console.log("[createCard] Usando imagen original como fallback:", imgUrl);
+    }
 
     if (!imgUrl) {
+      console.log("[createCard] ERROR: No se pudo obtener URL de imagen");
       return res
         .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
         .json({ message: "No se pudo generar la imagen de la carta" });
@@ -283,24 +304,75 @@ const createCard = async (req, res, next) => {
       cardData.defense = parsedDefense;
     }
 
+    console.log("[createCard] Datos finales de la carta:", cardData);
+    console.log("[createCard] Intentando crear carta...");
+    
     const savedCard = await Card.create(cardData);
+    console.log("[createCard] Carta creada exitosamente:", savedCard._id);
 
     try {
       await savedCard.populate("faction");
+      console.log("[createCard] Faction populate exitoso");
     } catch (error) {
       console.warn("Faction populate failed:", error.message);
     }
 
+    console.log("[createCard] Enviando respuesta...");
     return res.status(HTTP_RESPONSES.CREATED).json(savedCard);
   } catch (error) {
-    console.log(error);
+    console.log("[createCard] ERROR COMPLETO:", error);
+    console.log("[createCard] ERROR MESSAGE:", error.message);
+    console.log("[createCard] ERROR STACK:", error.stack);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+      .json({ message: "Error interno del servidor", error: error.message });
   }
 };
 
 const mockCreateCard = createCard;
+
+const testCreateCard = async (req, res, next) => {
+  try {
+    console.log("[testCreateCard] Iniciando prueba de creación de carta");
+    
+    // Buscar una facción existente
+    const faction = await Faction.findOne();
+    if (!faction) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ 
+        message: "No hay facciones disponibles para crear una carta de prueba" 
+      });
+    }
+    
+    console.log("[testCreateCard] Facción encontrada:", faction._id);
+    
+    const testCardData = {
+      title: "Carta de Prueba " + Date.now(),
+      description: "Esta es una carta de prueba creada para debugging",
+      type: "Spell",
+      cost: 3,
+      faction: faction._id,
+      img: "https://via.placeholder.com/400x600/ff0000/ffffff?text=Test+Card",
+      creator: "Sistema de Prueba",
+      date: new Date(),
+    };
+    
+    console.log("[testCreateCard] Datos de carta de prueba:", testCardData);
+    
+    const savedCard = await Card.create(testCardData);
+    console.log("[testCreateCard] Carta de prueba creada:", savedCard._id);
+    
+    return res.status(HTTP_RESPONSES.CREATED).json({
+      message: "Carta de prueba creada exitosamente",
+      card: savedCard
+    });
+  } catch (error) {
+    console.log("[testCreateCard] ERROR:", error);
+    return res.status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR).json({
+      message: "Error al crear carta de prueba",
+      error: error.message
+    });
+  }
+};
 
 const getCardById = async (req, res, next) => {
   try {
@@ -438,7 +510,45 @@ const removeFromCollection = async (req, res, next) => {
   }
 };
 
+const addToFavorites = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { cardId } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Usuario no encontrado");
+    }
+    if (!user.favorites.includes(cardId)) {
+      user.favorites.push(cardId);
+      await user.save();
+    }
+    return res.status(HTTP_RESPONSES.OK).json(user.favorites);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
 
+const removeFromFavorites = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { cardId } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Usuario no encontrado");
+    }
+    user.favorites = user.favorites.filter((id) => id.toString() !== cardId);
+    await user.save();
+    return res.status(HTTP_RESPONSES.OK).json(user.favorites);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
 
 module.exports = {
   getCards,
@@ -449,5 +559,9 @@ module.exports = {
   deleteCard,
   addToCollection,
   removeFromCollection,
+  addToFavorites,
+  removeFromFavorites,
+
   mockCreateCard,
+  testCreateCard,
 };

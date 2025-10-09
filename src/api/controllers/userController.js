@@ -143,7 +143,7 @@ const login = async (req, res) => {
 
     console.log("Usuario encontrado:", user ? user.username : "no encontrado");
     if (user) {
-      const match = await bcrypt.compare(password.trim(), user.password);
+      const match = await bcrypt.compare(password.trim(), user.password.trim());
       if (match) {
         const token = generarLlave(user._id);
         const userData = {
@@ -330,34 +330,51 @@ const deleteUser = async (req, res) => {
         .json({ message: "Usuario no encontrado" });
     }
 
+    // Importar todos los modelos necesarios
     const Card = require("../models/card");
     const Collection = require("../models/collection");
     const Friendship = require("../models/friendship");
     const Message = require("../models/message");
 
-    await Card.deleteMany({ creator: user.username });
-    await Card.deleteMany({ creator: user.email });
-    
-    await Collection.deleteMany({ creator: id });
-    
-    await Friendship.deleteMany({
-      $or: [
-        { requester: id },
-        { recipient: id }
-      ]
-    });
-    
-    await Message.deleteMany({
-      $or: [
-        { sender: id },
-        { recipient: id }
-      ]
-    });
+    console.log(
+      `Iniciando eliminación completa del usuario: ${user.username} (${id})`
+    );
 
+    // 1. Eliminar cartas creadas por el usuario
+    const deletedCards = await Card.deleteMany({
+      $or: [{ creator: user.username }, { creator: user.email }],
+    });
+    console.log(`Cartas eliminadas: ${deletedCards.deletedCount}`);
+
+    // 2. Eliminar colecciones del usuario
+    const deletedCollections = await Collection.deleteMany({ creator: id });
+    console.log(`Colecciones eliminadas: ${deletedCollections.deletedCount}`);
+
+    // 3. Eliminar todas las relaciones de amistad
+    const deletedFriendships = await Friendship.deleteMany({
+      $or: [{ requester: id }, { recipient: id }],
+    });
+    console.log(`Amistades eliminadas: ${deletedFriendships.deletedCount}`);
+
+    // 4. Eliminar TODOS los mensajes enviados y recibidos por el usuario
+    const deletedMessages = await Message.deleteMany({
+      $or: [{ sender: id }, { recipient: id }],
+    });
+    console.log(`Mensajes eliminados: ${deletedMessages.deletedCount}`);
+
+    // 5. Finalmente eliminar el usuario
     await User.findByIdAndDelete(id);
-    return res
-      .status(HTTP_RESPONSES.OK)
-      .json({ message: "Perfil eliminado correctamente junto con todo su contenido." });
+    console.log(`Usuario eliminado: ${user.username}`);
+
+    return res.status(HTTP_RESPONSES.OK).json({
+      message: "Perfil eliminado correctamente junto con todo su contenido.",
+      deletedData: {
+        cards: deletedCards.deletedCount,
+        collections: deletedCollections.deletedCount,
+        friendships: deletedFriendships.deletedCount,
+        messages: deletedMessages.deletedCount,
+      },
+    });
   } catch (error) {
     console.error("Error al eliminar el perfil:", error);
     return res

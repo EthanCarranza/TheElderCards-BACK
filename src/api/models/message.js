@@ -119,6 +119,12 @@ messageSchema.statics.getUserConversations = async function (userId) {
         as: "user",
       },
     },
+    // Filtrar conversaciones donde el usuario aún existe
+    {
+      $match: {
+        "user.0": { $exists: true },
+      },
+    },
     {
       $unwind: "$user",
     },
@@ -175,6 +181,40 @@ messageSchema.statics.getUnreadCount = async function (userId) {
   });
 
   return count;
+};
+
+// Método estático para limpiar mensajes huérfanos (donde sender o recipient ya no existen)
+messageSchema.statics.cleanupOrphanedMessages = async function () {
+  try {
+    const User = mongoose.model("users");
+
+    // Encontrar mensajes donde el sender ya no existe
+    const messagesWithInvalidSender = await this.find({}).select(
+      "sender recipient"
+    );
+    const orphanedMessages = [];
+
+    for (const message of messagesWithInvalidSender) {
+      const senderExists = await User.findById(message.sender);
+      const recipientExists = await User.findById(message.recipient);
+
+      if (!senderExists || !recipientExists) {
+        orphanedMessages.push(message._id);
+      }
+    }
+
+    if (orphanedMessages.length > 0) {
+      await this.deleteMany({ _id: { $in: orphanedMessages } });
+      console.log(
+        `Limpieza completada: ${orphanedMessages.length} mensajes huérfanos eliminados`
+      );
+    }
+
+    return orphanedMessages.length;
+  } catch (error) {
+    console.error("Error en limpieza de mensajes huérfanos:", error);
+    throw error;
+  }
 };
 
 module.exports = mongoose.model("Message", messageSchema);

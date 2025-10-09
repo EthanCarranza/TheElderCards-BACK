@@ -6,7 +6,8 @@ const {
   getConversations,
   markMessagesAsRead,
   getUnreadCount,
-  deleteMessage
+  deleteMessage,
+  cleanupOrphanedData,
 } = require("../controllers/messageController");
 const { isAuth } = require("../../middlewares/auth");
 
@@ -27,5 +28,8 @@ router.patch("/read/:senderId", isAuth, markMessagesAsRead);
 
 // Eliminar mensaje (opcional)
 router.delete("/:messageId", isAuth, deleteMessage);
+
+// Limpiar datos huérfanos (solo administradores)
+router.post("/cleanup-orphaned", isAuth, cleanupOrphanedData);
 
 module.exports = router;

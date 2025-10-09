@@ -22,9 +22,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre("save", function () {
-  if (this.isModified('password')) {
-    this.password = bcrypt.hashSync(this.password, 10);
-  }
+  this.password = bcrypt.hashSync(this.password, 10);
 });
 
 const User = mongoose.model("users", userSchema, "users");

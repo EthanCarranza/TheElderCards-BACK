@@ -7,7 +7,7 @@ const collectionSchema = new mongoose.Schema(
     img: { type: String, trim: true },
     creator: { 
       type: mongoose.Schema.Types.ObjectId, 
-      ref: "User", 
+      ref: "users", 
       required: true 
     },
     isPrivate: { type: Boolean, default: false },

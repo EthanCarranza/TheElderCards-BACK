@@ -137,8 +137,10 @@ const getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // Obtener conversaciones existentes (ya filtradas para usuarios que existen)
     const existingConversations = await Message.getUserConversations(userId);
 
+    // Obtener amistades activas
     const friendships = await Friendship.getFriends(userId);
 
     const existingConversationMap = new Map();
@@ -148,13 +150,19 @@ const getConversations = async (req, res) => {
 
     const allConversations = [...existingConversations];
 
+    // Añadir amigos que no tienen conversaciones activas
     friendships.forEach((friendship) => {
       const friend =
         friendship.requester._id.toString() === userId
           ? friendship.recipient
           : friendship.requester;
 
-      if (!existingConversationMap.has(friend._id.toString())) {
+      // Verificar que el amigo no sea null/undefined (por si hay problemas de populate)
+      if (
+        friend &&
+        friend._id &&
+        !existingConversationMap.has(friend._id.toString())
+      ) {
         allConversations.push({
           userId: friend._id,
           user: {
@@ -267,6 +275,44 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+const cleanupOrphanedData = async (req, res) => {
+  try {
+    // Solo permitir a administradores ejecutar la limpieza
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(HTTP_RESPONSES.FORBIDDEN).json({
+        message:
+          "Solo los administradores pueden ejecutar la limpieza de datos",
+      });
+    }
+
+    console.log("Iniciando limpieza de datos huérfanos...");
+
+    // Limpiar mensajes huérfanos
+    const orphanedMessages = await Message.cleanupOrphanedMessages();
+
+    // Limpiar amistades huérfanas
+    const orphanedFriendships = await Friendship.cleanupOrphanedFriendships();
+
+    const result = {
+      message: "Limpieza de datos huérfanos completada",
+      deletedData: {
+        messages: orphanedMessages,
+        friendships: orphanedFriendships,
+      },
+      totalDeleted: orphanedMessages + orphanedFriendships,
+    };
+
+    console.log("Limpieza completada:", result);
+
+    return res.status(HTTP_RESPONSES.OK).json(result);
+  } catch (error) {
+    console.error("Error al limpiar datos huérfanos:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
 module.exports = {
   sendMessage,
   getConversation,
@@ -274,4 +320,5 @@ module.exports = {
   markMessagesAsRead,
   getUnreadCount,
   deleteMessage,
+  cleanupOrphanedData,
 };
