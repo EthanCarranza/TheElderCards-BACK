@@ -38,25 +38,26 @@ app.get("/api/health", async (req, res) => {
     const mongoose = require("mongoose");
     const Card = require("./src/api/models/card");
     const Faction = require("./src/api/models/faction");
-    
-    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+
+    const dbStatus =
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected";
     const cardCount = await Card.countDocuments();
     const factionCount = await Faction.countDocuments();
-    
+
     res.json({
       status: "OK",
       database: dbStatus,
       collections: {
         cards: cardCount,
-        factions: factionCount
+        factions: factionCount,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     res.status(500).json({
       status: "ERROR",
       message: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });

@@ -39,7 +39,7 @@ const getUsers = async (req, res) => {
     const sanitized = users.map((user) => sanitizeUser(user));
     return res.status(HTTP_RESPONSES.OK).json(sanitized);
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener usuarios:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
@@ -52,12 +52,11 @@ const getUserById = async (req, res) => {
     if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id faltante" });
-    }
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+        .json({ message: "Id de usuario requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id de usuario invalido" });
+        .json({ message: "Id de usuario inválido" });
     }
 
     if (req.user && !hasAccessToUser(req.user, id)) {
@@ -74,7 +73,7 @@ const getUserById = async (req, res) => {
     }
     return res.status(HTTP_RESPONSES.OK).json(sanitizeUser(user));
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener usuario por Id:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
@@ -90,25 +89,24 @@ const register = async (req, res) => {
       });
     }
 
-    const trimmedUsername = username.trim();
-    const normalizedEmail = email.trim().toLowerCase();
-
-    const nameDuplicated = await User.findOne({ username: trimmedUsername });
-    const emailDuplicated = await User.findOne({ email: normalizedEmail });
+    const nameDuplicated = await User.findOne({ username: username.trim() });
+    const emailDuplicated = await User.findOne({
+      email: email.trim().toLowerCase(),
+    });
     if (nameDuplicated) {
       return res
         .status(HTTP_RESPONSES.CONFLICT)
-        .json({ message: "Usuario ya existente" });
+        .json({ message: "Ya existe un usuario con ese nombre" });
     }
     if (emailDuplicated) {
       return res
         .status(HTTP_RESPONSES.CONFLICT)
-        .json({ message: "Email ya registrado" });
+        .json({ message: "Ya existe un usuario con ese email" });
     }
 
     const newUser = new User({
-      username: trimmedUsername,
-      email: normalizedEmail,
+      username: username.trim(),
+      email: email.trim().toLowerCase(),
       password,
       image: DEFAULT_PROFILE_IMAGE,
       role: "user",
@@ -116,7 +114,7 @@ const register = async (req, res) => {
     const user = await newUser.save();
     return res.status(HTTP_RESPONSES.CREATED).json(sanitizeUser(user));
   } catch (error) {
-    console.log(error);
+    console.error("Error al registrar usuario:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
@@ -165,7 +163,7 @@ const login = async (req, res) => {
         .json({ message: "Credenciales incorrectas" });
     }
   } catch (error) {
-    console.log(error);
+    console.error("Error al iniciar sesión:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
@@ -179,12 +177,11 @@ const updateUser = async (req, res) => {
     if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id faltante" });
-    }
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+        .json({ message: "Id de usuario requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id de usuario invalido" });
+        .json({ message: "Id de usuario inválido" });
     }
     if (!req.user || !hasAccessToUser(req.user, id)) {
       return res
@@ -249,7 +246,7 @@ const updateUser = async (req, res) => {
 
     return res.status(HTTP_RESPONSES.OK).json(sanitizeUser(userUpdated));
   } catch (error) {
-    console.log(error);
+    console.error("Error al actualizar usuario:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
@@ -262,12 +259,11 @@ const updateImage = async (req, res) => {
     if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id faltante" });
-    }
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+        .json({ message: "Id de usuario requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id de usuario invalido" });
+        .json({ message: "Id de usuario inválido" });
     }
     if (!req.user || !hasAccessToUser(req.user, id)) {
       return res
@@ -297,7 +293,7 @@ const updateImage = async (req, res) => {
       user: sanitizeUser(userUpdated),
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: HTTP_MESSAGES.INTERNAL_SERVER_ERROR });
@@ -310,12 +306,11 @@ const deleteUser = async (req, res) => {
     if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id faltante" });
-    }
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+        .json({ message: "Id de usuario requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "Id de usuario invalido" });
+        .json({ message: "Id de usuario inválido" });
     }
     if (!req.user || !hasAccessToUser(req.user, id)) {
       return res
@@ -330,7 +325,6 @@ const deleteUser = async (req, res) => {
         .json({ message: "Usuario no encontrado" });
     }
 
-    // Importar todos los modelos necesarios
     const Card = require("../models/card");
     const Collection = require("../models/collection");
     const Friendship = require("../models/friendship");
@@ -340,29 +334,24 @@ const deleteUser = async (req, res) => {
       `Iniciando eliminación completa del usuario: ${user.username} (${id})`
     );
 
-    // 1. Eliminar cartas creadas por el usuario
     const deletedCards = await Card.deleteMany({
       $or: [{ creator: user.username }, { creator: user.email }],
     });
     console.log(`Cartas eliminadas: ${deletedCards.deletedCount}`);
 
-    // 2. Eliminar colecciones del usuario
     const deletedCollections = await Collection.deleteMany({ creator: id });
     console.log(`Colecciones eliminadas: ${deletedCollections.deletedCount}`);
 
-    // 3. Eliminar todas las relaciones de amistad
     const deletedFriendships = await Friendship.deleteMany({
       $or: [{ requester: id }, { recipient: id }],
     });
     console.log(`Amistades eliminadas: ${deletedFriendships.deletedCount}`);
 
-    // 4. Eliminar TODOS los mensajes enviados y recibidos por el usuario
     const deletedMessages = await Message.deleteMany({
       $or: [{ sender: id }, { recipient: id }],
     });
     console.log(`Mensajes eliminados: ${deletedMessages.deletedCount}`);
 
-    // 5. Finalmente eliminar el usuario
     await User.findByIdAndDelete(id);
     console.log(`Usuario eliminado: ${user.username}`);
 

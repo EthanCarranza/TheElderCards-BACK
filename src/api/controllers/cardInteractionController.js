@@ -1,6 +1,5 @@
 const Card = require("../models/card");
 const CardInteraction = require("../models/cardInteraction");
-const User = require("../models/user");
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 
 const toggleLike = async (req, res) => {
@@ -11,7 +10,7 @@ const toggleLike = async (req, res) => {
     if (!cardId) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "ID de carta requerido" });
+        .json({ message: "Id de carta requerido" });
     }
 
     const card = await Card.findById(cardId);
@@ -40,7 +39,7 @@ const toggleLike = async (req, res) => {
       stats,
     });
   } catch (error) {
-    console.error("Error al actualizar like:", error);
+    console.error("Error al actualizar like de carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -55,7 +54,7 @@ const toggleFavorite = async (req, res) => {
     if (!cardId) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "ID de carta requerido" });
+        .json({ message: "Id de carta requerido" });
     }
 
     const card = await Card.findById(cardId);
@@ -84,7 +83,7 @@ const toggleFavorite = async (req, res) => {
       stats,
     });
   } catch (error) {
-    console.error("Error al actualizar favorito:", error);
+    console.error("Error al actualizar favorito de carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -98,13 +97,13 @@ const getCardStatistics = async (req, res) => {
     if (!cardId) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "ID de carta requerido" });
+        .json({ message: "Id de carta requerido" });
     }
 
     const stats = await getCardStats(cardId);
     return res.status(HTTP_RESPONSES.OK).json(stats);
   } catch (error) {
-    console.error("Error al obtener estadísticas:", error);
+    console.error("Error al obtener estadísticas de carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -123,7 +122,7 @@ const getUserCardInteraction = async (req, res) => {
       favorited: interaction?.favorited || false,
     });
   } catch (error) {
-    console.error("Error al obtener interacción:", error);
+    console.error("Error al obtener interacción de usuario con carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -174,7 +173,7 @@ const getUserFavoriteCards = async (req, res) => {
       total,
     });
   } catch (error) {
-    console.error("Error al obtener cartas favoritas:", error);
+    console.error("Error al obtener cartas favoritas del usuario:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);

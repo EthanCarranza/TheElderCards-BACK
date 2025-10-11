@@ -58,34 +58,32 @@ async function generateFramedImage(
   attack,
   defense
 ) {
-  // Tamaño estándar vertical
   const canvasWidth = 400;
   const canvasHeight = 600;
   const border = 12;
   const cutSize = 48;
-  const imageHeight = Math.floor(canvasHeight / 2); // Ocupa la mitad de la carta
+  const imageHeight = Math.floor(canvasHeight / 2);
   const titleBarHeight = 56;
   const typeBarHeight = 32;
   const footerHeight = 68;
   const descY = imageHeight + titleBarHeight + typeBarHeight;
-  const defenseHeight = 38; // Altura del recuadro de ataque/defensa
-  const defenseMargin = 8; // Margen adicional para separación
+  const defenseHeight = 38;
+  const defenseMargin = 8;
   const availableDescHeight = Math.max(
     canvasHeight - border - descY - defenseHeight - defenseMargin,
     0
   );
-  const descHeight = availableDescHeight; // Usar todo el espacio disponible
+  const descHeight = availableDescHeight;
   const footerY = canvasHeight - border - footerHeight;
   const normalizedCreator =
     creator && creator !== "undefined" && creator.trim().length > 0
       ? creator.trim()
       : "Anónimo";
 
-  // Crear canvas
   const canvas = createCanvas(canvasWidth, canvasHeight);
   const ctx = canvas.getContext("2d");
 
-  // Dibuja marco con esquinas recortadas
+  // Esquinas recortadas
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -99,7 +97,7 @@ async function generateFramedImage(
   ctx.fill();
   ctx.restore();
 
-  // Fondo interior blanco
+  // Fondo interior
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(border, border);
@@ -113,11 +111,11 @@ async function generateFramedImage(
   ctx.fill();
   ctx.restore();
 
-  // Imagen principal arriba
+  // Imagen principal
   const inputIsRemote =
     typeof inputImagePath === "string" && /^https?:\/\//.test(inputImagePath);
   let imageInput = inputImagePath;
-  // Si es una URL remota, descargar como buffer
+
   if (inputIsRemote) {
     const axios = require("axios");
     const response = await axios({
@@ -134,7 +132,7 @@ async function generateFramedImage(
     })
     .toBuffer();
   const img = await loadImage(resizedImage);
-  // Recorte de la imagen superior con esquinas recortadas
+  // Recorte de la imagen con esquinas recortadas
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(border, border);
@@ -154,7 +152,7 @@ async function generateFramedImage(
   ctx.drawImage(img, imgX, imgY, drawWidth, imageHeight);
   ctx.restore();
 
-  // Círculo de coste en la esquina superior izquierda
+  // Coste
   ctx.save();
   const costRadius = 28;
   const extraMargin = 2;
@@ -173,7 +171,7 @@ async function generateFramedImage(
   ctx.fillText(String(cost), costX, costY);
   ctx.restore();
 
-  // Franja del titulo
+  // Titulo
   ctx.save();
   ctx.fillStyle = "#c6c6c6";
   ctx.fillRect(border, imageHeight, canvasWidth - 2 * border, titleBarHeight);
@@ -184,7 +182,7 @@ async function generateFramedImage(
   ctx.fillText(title, canvasWidth / 2, imageHeight + titleBarHeight / 2);
   ctx.restore();
 
-  // Franja del tipo
+  // Tipo
   ctx.save();
   ctx.fillStyle = "#dadada";
   ctx.fillRect(
@@ -203,6 +201,8 @@ async function generateFramedImage(
     imageHeight + titleBarHeight + typeBarHeight / 2
   );
   ctx.restore();
+
+  // Descripción
   if (descHeight > 0) {
     ctx.save();
     ctx.fillStyle = "#f0f0f0";
@@ -221,22 +221,18 @@ async function generateFramedImage(
     let currentLine = "";
 
     for (const word of words) {
-      // Si la palabra es más larga que el ancho disponible, cortarla
       if (ctx.measureText(word).width > descBoxWidth) {
-        // Si hay una línea actual, añadirla primero
         if (currentLine) {
           lines.push(currentLine);
           if (lines.length >= maxLines) break;
           currentLine = "";
         }
 
-        // Cortar la palabra larga en pedazos
         let remainingWord = word;
         while (remainingWord && lines.length < maxLines) {
           let i = remainingWord.length;
           let chunk = remainingWord;
 
-          // Reducir el tamaño del chunk hasta que quepa
           while (ctx.measureText(chunk).width > descBoxWidth && i > 0) {
             i--;
             chunk = remainingWord.substring(0, i);
@@ -246,7 +242,6 @@ async function generateFramedImage(
             lines.push(chunk);
             remainingWord = remainingWord.substring(i);
           } else {
-            // Si ni siquiera un carácter cabe, forzar al menos uno
             lines.push(remainingWord[0]);
             remainingWord = remainingWord.substring(1);
           }
@@ -271,10 +266,9 @@ async function generateFramedImage(
       lines.push(currentLine);
     }
 
-    // Dibujar las líneas centradas verticalmente
     const totalLines = Math.min(lines.length, maxLines);
     const totalTextHeight = totalLines * lineHeight;
-    const fixedPadding = 16; // Padding fijo arriba y abajo
+    const fixedPadding = 16;
     const availableHeight = descHeight - fixedPadding * 2;
     const extraSpace = Math.max(availableHeight - totalTextHeight, 0);
     const startY = descY + fixedPadding + extraSpace / 2;
@@ -285,7 +279,7 @@ async function generateFramedImage(
     });
     ctx.restore();
   }
-  // Pie con nombre del creador
+  // Nombre del creador
   ctx.save();
   const footerLabelFont = 12;
   const footerNameFont = 14;
@@ -338,25 +332,19 @@ async function generateFramedImage(
     ctx.restore();
   }
 
-  // Generar buffer de la imagen (sin guardar archivo local)
   const pngBuffer = await canvas.encode("png");
-
-  // Subir directamente a Cloudinary desde el buffer
   let cloudinaryUrl = null;
   try {
-    // Convertir buffer a base64 para Cloudinary
     const base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
-
     const uploadResult = await cloudinary.uploader.upload(base64Image, {
       folder: "Cards",
       resource_type: "image",
     });
     cloudinaryUrl = uploadResult.secure_url;
-  } catch (err) {
+  } catch (error) {
     console.error("Error subiendo a Cloudinary:", err);
     throw err;
   } finally {
-    // Solo intentar eliminar la imagen de entrada si no es remota
     try {
       if (!inputIsRemote && typeof inputImagePath === "string") {
         await fs.promises.unlink(inputImagePath);
@@ -365,7 +353,6 @@ async function generateFramedImage(
       console.warn("No se pudo eliminar la imagen de entrada:", unlinkErr);
     }
   }
-
   return cloudinaryUrl;
 }
 

@@ -1,13 +1,8 @@
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const Collection = require("../models/collection");
 const CollectionInteraction = require("../models/collectionInteraction");
-const User = require("../models/user");
 const mongoose = require("mongoose");
-const {
-  safePopulateUser,
-  applySafePopulate,
-  DELETED_USER_PLACEHOLDER,
-} = require("../../utils/safePopulate");
+const { DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
 
 const isOwner = (creatorId, userId) => {
   if (!creatorId || !userId) return false;
@@ -32,47 +27,53 @@ const getCollections = async (req, res, next) => {
       .populate("cards")
       .exec();
 
-    collections = await Promise.all(collections.map(async (collection) => {
-      try {
-        const populated = await Collection.populate(collection, {
-          path: "creator",
-          select: "username email"
-        });
-        return populated;
-      } catch (error) {
-        collection.creator = DELETED_USER_PLACEHOLDER;
-        return collection;
-      }
-    }));
+    collections = await Promise.all(
+      collections.map(async (collection) => {
+        let populatedCollection;
+        try {
+          populatedCollection = await Collection.findById(collection._id)
+            .populate("creator", "username email")
+            .populate("cards")
+            .exec();
+        } catch (error) {
+          populatedCollection = collection.toObject();
+          populatedCollection.creator = DELETED_USER_PLACEHOLDER;
+        }
+        return populatedCollection;
+      })
+    );
 
     if (req.user) {
       const userId = req.user._id;
-      let privateCollections = await Collection.find({ 
-        creator: userId, 
-        isPrivate: true 
+      let privateCollections = await Collection.find({
+        creator: userId,
+        isPrivate: true,
       })
         .populate("cards")
         .exec();
 
-      privateCollections = await Promise.all(privateCollections.map(async (collection) => {
-        try {
-          const populated = await Collection.populate(collection, {
-            path: "creator",
-            select: "username email"
-          });
-          return populated;
-        } catch (error) {
-          collection.creator = DELETED_USER_PLACEHOLDER;
-          return collection;
-        }
-      }));
+      privateCollections = await Promise.all(
+        privateCollections.map(async (collection) => {
+          let populatedCollection;
+          try {
+            populatedCollection = await Collection.findById(collection._id)
+              .populate("creator", "username email")
+              .populate("cards")
+              .exec();
+          } catch (error) {
+            populatedCollection = collection.toObject();
+            populatedCollection.creator = DELETED_USER_PLACEHOLDER;
+          }
+          return populatedCollection;
+        })
+      );
 
       collections = [...collections, ...privateCollections];
     }
 
     return res.status(HTTP_RESPONSES.OK).json(collections);
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener colecciones:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -82,47 +83,47 @@ const getCollections = async (req, res, next) => {
 const getCollectionById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Id de colección no válido");
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
     }
+
     const collection = await Collection.findById(id);
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
+        .json({ message: "Colección no encontrada" });
     }
 
-    const creatorId = collection.creator; // Este es el ID original como string
-
+    const creatorId = collection.creator;
     if (
       collection.isPrivate &&
       (!req.user || !isOwner(creatorId, req.user._id))
     ) {
       return res
         .status(HTTP_RESPONSES.FORBIDDEN)
-        .json("No tienes permiso para ver esta colección privada");
+        .json({ message: "No tienes permiso para ver esta colección privada" });
     }
 
-    let populatedCollection = await Collection.findById(id)
-      .populate("cards")
-      .exec();
-      
-    if (populatedCollection) {
-      try {
-        populatedCollection = await Collection.populate(populatedCollection, {
-          path: "creator",
-          select: "username email"
-        });
-      } catch (error) {
-        populatedCollection.creator = DELETED_USER_PLACEHOLDER;
-      }
+    let populatedCollection;
+    try {
+      populatedCollection = await Collection.findById(id)
+        .populate("creator", "username email")
+        .populate("cards")
+        .exec();
+    } catch (error) {
+      populatedCollection = collection.toObject();
+      populatedCollection.creator = DELETED_USER_PLACEHOLDER;
     }
 
     return res.status(HTTP_RESPONSES.OK).json(populatedCollection);
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener colección por Id:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -133,30 +134,34 @@ const getCollectionByTitle = async (req, res, next) => {
   try {
     const { title } = req.params;
     if (!title) {
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json("Titulo faltante");
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Titulo faltante" });
     }
     let collection = await Collection.findOne({ title })
       .populate("cards")
       .exec();
 
+    let populatedCollection;
     if (collection) {
       try {
-        collection = await Collection.populate(collection, {
-          path: "creator",
-          select: "username email"
-        });
+        populatedCollection = await Collection.findById(collection._id)
+          .populate("creator", "username email")
+          .populate("cards")
+          .exec();
       } catch (error) {
-        collection.creator = DELETED_USER_PLACEHOLDER;
+        populatedCollection = collection.toObject();
+        populatedCollection.creator = DELETED_USER_PLACEHOLDER;
       }
     }
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
+        .json({ message: "Colección no encontrada" });
     }
-    return res.status(HTTP_RESPONSES.OK).json(collection);
+    return res.status(HTTP_RESPONSES.OK).json(populatedCollection);
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener colección por título:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -165,12 +170,6 @@ const getCollectionByTitle = async (req, res, next) => {
 
 const createCollection = async (req, res, next) => {
   try {
-    if (!req.user) {
-      return res
-        .status(HTTP_RESPONSES.UNAUTHORIZED)
-        .json({ message: "Token no proporcionado, acceso no autorizado" });
-    }
-
     const title = (req.body.title || "").trim();
     if (!title) {
       return res
@@ -186,10 +185,8 @@ const createCollection = async (req, res, next) => {
       isPrivate: req.body.isPrivate === true || req.body.isPrivate === "true",
       cards: Array.isArray(req.body.cards) ? req.body.cards : [],
     });
-    
+
     const collection = await newCollection.save();
-    
-    // Populator la colección creada para devolver los datos del creator
     let populatedCollection;
     try {
       populatedCollection = await Collection.findById(collection._id)
@@ -198,14 +195,13 @@ const createCollection = async (req, res, next) => {
         .exec();
     } catch (error) {
       console.warn("Error al populator creator:", error);
-      // Si falla el populate, usar el placeholder
       populatedCollection = collection.toObject();
       populatedCollection.creator = DELETED_USER_PLACEHOLDER;
     }
-    
+
     return res.status(HTTP_RESPONSES.CREATED).json(populatedCollection);
   } catch (error) {
-    console.log("Error al crear colección:", error);
+    console.error("Error al crear colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -219,25 +215,50 @@ const addCardToCollection = async (req, res, next) => {
     if (!id || !cardId) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Id de colección o carta faltante");
+        .json({ message: "Id de colección o carta faltante" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
+    } else if (!mongoose.Types.ObjectId.isValid(cardId)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de carta inválido" });
     }
 
     const collection = await Collection.findById(id);
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
+        .json({ message: "Colección no encontrada" });
     }
-
-    if (!collection.cards.map((c) => c.toString()).includes(cardId)) {
-      collection.cards.push(cardId);
-      await collection.save();
-      return res.status(HTTP_RESPONSES.OK).json(collection);
+    if (
+      !req.user ||
+      collection.creator.toString() !== req.user._id.toString()
+    ) {
+      return res
+        .status(HTTP_RESPONSES.FORBIDDEN)
+        .json({ message: "No tienes permiso para modificar esta colección" });
     }
-
-    return res.status(200).json({ message: "No changes" });
+    const alreadyIn = collection.cards
+      .map((c) => c.toString())
+      .includes(cardId);
+    if (alreadyIn) {
+      return res
+        .status(HTTP_RESPONSES.CONFLICT)
+        .json({ message: "La carta ya está en la colección" });
+    }
+    collection.cards.push(cardId);
+    await collection.save();
+    const payload =
+      typeof collection.toObject === "function"
+        ? collection.toObject()
+        : collection;
+    return res
+      .status(HTTP_RESPONSES.OK)
+      .json({ ...payload, _meta: { added: true } });
   } catch (error) {
-    console.log(error);
+    console.error("Error al agregar carta a colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -251,47 +272,22 @@ const removeCardFromCollection = async (req, res, next) => {
     if (!id || !cardId) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Id de colección o carta faltante");
-    }
-
-    const collection = await Collection.findById(id);
-    if (!collection) {
-      return res
-        .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
-    }
-
-    if (collection.cards.map((c) => c.toString()).includes(cardId)) {
-      collection.cards = collection.cards.filter(
-        (c) => c.toString() !== cardId
-      );
-      await collection.save();
-      return res.status(HTTP_RESPONSES.OK).json(collection);
-    }
-
-    return res.status(200).json({ message: "No changes" });
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
-const addCardToCollectionSecure = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { cardId } = req.body;
-    if (!id || !cardId) {
+        .json({ message: "Id de colección o carta faltante" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Id de colección o carta faltante");
+        .json({ message: "Id de colección inválido" });
+    } else if (!mongoose.Types.ObjectId.isValid(cardId)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de carta inválido" });
     }
+
     const collection = await Collection.findById(id);
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
+        .json({ message: "Colección no encontrada" });
     }
     if (
       !req.user ||
@@ -299,55 +295,7 @@ const addCardToCollectionSecure = async (req, res, next) => {
     ) {
       return res
         .status(HTTP_RESPONSES.FORBIDDEN)
-        .json("No tienes permiso para modificar esta colección");
-    }
-    const alreadyIn = collection.cards
-      .map((c) => c.toString())
-      .includes(cardId);
-    if (alreadyIn) {
-      return res
-        .status(HTTP_RESPONSES.CONFLICT || 409)
-        .json({ message: "La carta ya está en la colección" });
-    }
-    collection.cards.push(cardId);
-    await collection.save();
-    const payload =
-      typeof collection.toObject === "function"
-        ? collection.toObject()
-        : collection;
-    return res
-      .status(HTTP_RESPONSES.OK)
-      .json({ ...payload, _meta: { added: true } });
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
-const removeCardFromCollectionSecure = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { cardId } = req.body;
-    if (!id || !cardId) {
-      return res
-        .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json("Id de colección o carta faltante");
-    }
-    const collection = await Collection.findById(id);
-    if (!collection) {
-      return res
-        .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
-    }
-    if (
-      !req.user ||
-      collection.creator.toString() !== req.user._id.toString()
-    ) {
-      return res
-        .status(HTTP_RESPONSES.FORBIDDEN)
-        .json("No tienes permiso para modificar esta colección");
+        .json({ message: "No tienes permiso para modificar esta colección" });
     }
     const wasIn = collection.cards.map((c) => c.toString()).includes(cardId);
     let removed = false;
@@ -366,7 +314,7 @@ const removeCardFromCollectionSecure = async (req, res, next) => {
       .status(HTTP_RESPONSES.OK)
       .json({ ...payload, _meta: { removed } });
   } catch (error) {
-    console.log(error);
+    console.error("Error al quitar carta de colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -376,7 +324,15 @@ const removeCardFromCollectionSecure = async (req, res, next) => {
 const updateCollection = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, description, isPrivate } = req.body;
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
+    }
 
     const collection = await Collection.findById(id);
     if (!collection) {
@@ -385,6 +341,14 @@ const updateCollection = async (req, res, next) => {
         .json({ message: "Colección no encontrada" });
     }
 
+    const title = (req.body.title || "").trim();
+    const description =
+      req.body.description !== undefined
+        ? req.body.description.trim()
+        : undefined;
+    const isPrivate =
+      req.body.isPrivate === true || req.body.isPrivate === "true";
+
     const userId = req.user._id.toString();
     if (collection.creator.toString() !== userId) {
       return res
@@ -392,60 +356,50 @@ const updateCollection = async (req, res, next) => {
         .json({ message: "No tienes permiso para editar esta colección" });
     }
 
-    const updates = {};
-    if (title && title.trim()) {
-      const existingCollection = await Collection.findOne({
-        title: title.trim(),
-        _id: { $ne: id },
-      });
-      if (existingCollection) {
+    const updateData = {};
+    if (title && title !== collection.title) {
+      const nameExists = await Collection.findOne({ title });
+      if (nameExists && nameExists._id.toString() !== id.toString()) {
         return res
           .status(HTTP_RESPONSES.CONFLICT)
           .json({ message: "Ya existe una colección con ese título" });
       }
-      updates.title = title.trim();
+      updateData.title = title;
     }
-
     if (description !== undefined) {
-      updates.description = description.trim();
+      updateData.description = description;
     }
-
-    if (typeof isPrivate === "boolean") {
-      updates.isPrivate = isPrivate;
-    }
-
+    updateData.isPrivate = isPrivate;
     if (req.file && req.file.path) {
-      updates.img = req.file.path;
+      updateData.img = req.file.path;
     }
 
-    const updatedCollection = await Collection.findByIdAndUpdate(id, updates, {
-      new: true,
-      runValidators: true,
-    }).populate("cards");
-
-    const processedCollection = updatedCollection.toObject();
+    let updatedCollection;
     try {
-      const User = require("../models/user");
-      const creator = await User.findById(processedCollection.creator).select(
-        "username email"
-      );
-
-      if (creator) {
-        processedCollection.creator = {
-          _id: creator._id,
-          username: creator.username,
-          email: creator.email,
-        };
-      } else {
-        processedCollection.creator = DELETED_USER_PLACEHOLDER;
-      }
+      updatedCollection = await Collection.findByIdAndUpdate(id, updateData, {
+        new: true,
+        runValidators: true,
+      });
     } catch (error) {
-      processedCollection.creator = DELETED_USER_PLACEHOLDER;
+      return res
+        .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+        .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
     }
 
-    return res.status(HTTP_RESPONSES.OK).json(processedCollection);
+    let populatedCollection;
+    try {
+      populatedCollection = await Collection.findById(updatedCollection._id)
+        .populate("creator", "username email")
+        .populate("cards")
+        .exec();
+    } catch (error) {
+      populatedCollection = updatedCollection.toObject();
+      populatedCollection.creator = DELETED_USER_PLACEHOLDER;
+    }
+
+    return res.status(HTTP_RESPONSES.OK).json(populatedCollection);
   } catch (error) {
-    console.error("Error al actualizar la colección:", error);
+    console.error("Error al actualizar colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -455,6 +409,15 @@ const updateCollection = async (req, res, next) => {
 const deleteCollection = async (req, res, next) => {
   try {
     const { id } = req.params;
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
+    }
 
     const collection = await Collection.findById(id);
     if (!collection) {
@@ -475,22 +438,11 @@ const deleteCollection = async (req, res, next) => {
       .status(HTTP_RESPONSES.OK)
       .json({ message: "Colección eliminada correctamente." });
   } catch (error) {
-    console.error("Error al eliminar la colección:", error);
+    console.error("Error al eliminar colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
-};
-
-module.exports = {
-  getCollections,
-  getCollectionById,
-  getCollectionByTitle,
-  createCollection,
-  updateCollection,
-  deleteCollection,
-  addCardToCollection: addCardToCollectionSecure,
-  removeCardFromCollection: removeCardFromCollectionSecure,
 };
 
 const getCollectionsByUser = async (req, res) => {
@@ -516,21 +468,23 @@ const getCollectionsByUser = async (req, res) => {
         .exec();
     }
 
-    collections = await Promise.all(collections.map(async (collection) => {
-      try {
-        const populated = await Collection.populate(collection, {
-          path: "creator",
-          select: "username email"
-        });
-        return populated;
-      } catch (error) {
-        collection.creator = DELETED_USER_PLACEHOLDER;
-        return collection;
-      }
-    }));
+    collections = await Promise.all(
+      collections.map(async (collection) => {
+        try {
+          const populated = await Collection.populate(collection, {
+            path: "creator",
+            select: "username email",
+          });
+          return populated;
+        } catch (error) {
+          collection.creator = DELETED_USER_PLACEHOLDER;
+          return collection;
+        }
+      })
+    );
     return res.status(HTTP_RESPONSES.OK).json(collections || []);
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener colecciones por usuario:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -539,31 +493,30 @@ const getCollectionsByUser = async (req, res) => {
 
 const getMyCollections = async (req, res) => {
   try {
-    if (!req.user) {
-      return res
-        .status(HTTP_RESPONSES.UNAUTHORIZED)
-        .json({ message: "Token no proporcionado, acceso no autorizado" });
-    }
     let collections = await Collection.find({
       creator: req.user._id.toString(),
-    }).populate("cards").exec();
+    })
+      .populate("cards")
+      .exec();
 
-    collections = await Promise.all(collections.map(async (collection) => {
-      try {
-        const populated = await Collection.populate(collection, {
-          path: "creator",
-          select: "username email"
-        });
-        return populated;
-      } catch (error) {
-        collection.creator = DELETED_USER_PLACEHOLDER;
-        return collection;
-      }
-    }));
+    collections = await Promise.all(
+      collections.map(async (collection) => {
+        try {
+          const populated = await Collection.populate(collection, {
+            path: "creator",
+            select: "username email",
+          });
+          return populated;
+        } catch (error) {
+          collection.creator = DELETED_USER_PLACEHOLDER;
+          return collection;
+        }
+      })
+    );
 
     return res.status(HTTP_RESPONSES.OK).json(collections || []);
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener mis colecciones:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -572,18 +525,17 @@ const getMyCollections = async (req, res) => {
 
 const addFavoriteCollection = async (req, res) => {
   try {
-    if (!req.user) {
-      return res
-        .status(HTTP_RESPONSES.UNAUTHORIZED)
-        .json({ message: "Token no proporcionado, acceso no autorizado" });
-    }
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Id de colección inválido" });
     }
-    
+
     const collection = await Collection.findById(id);
     if (!collection) {
       return res
@@ -592,7 +544,10 @@ const addFavoriteCollection = async (req, res) => {
     }
 
     const userId = req.user.id;
-    let interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+    let interaction = await CollectionInteraction.findOne({
+      userId,
+      collectionId: id,
+    });
 
     if (!interaction) {
       interaction = new CollectionInteraction({ userId, collectionId: id });
@@ -606,7 +561,7 @@ const addFavoriteCollection = async (req, res) => {
 
     return res.status(HTTP_RESPONSES.OK).json({ success: true });
   } catch (error) {
-    console.log(error);
+    console.error("Error al agregar colección a favoritos:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -615,15 +570,21 @@ const addFavoriteCollection = async (req, res) => {
 
 const removeFavoriteCollection = async (req, res) => {
   try {
-    if (!req.user) {
-      return res
-        .status(HTTP_RESPONSES.UNAUTHORIZED)
-        .json({ message: "Token no proporcionado, acceso no autorizado" });
-    }
     const { id } = req.params;
-    const userId = req.user.id;
-    
-    const interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
+    }
+
+    const interaction = await CollectionInteraction.findOne({
+      userId: req.user.id,
+      collectionId: id,
+    });
     if (interaction && interaction.favorited) {
       interaction.favorited = false;
       interaction.favoritedAt = null;
@@ -632,7 +593,7 @@ const removeFavoriteCollection = async (req, res) => {
 
     return res.status(HTTP_RESPONSES.OK).json({ success: true });
   } catch (error) {
-    console.log(error);
+    console.error("Error al quitar colección de favoritos:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -640,62 +601,21 @@ const removeFavoriteCollection = async (req, res) => {
 };
 
 const getFavoriteCollections = async (req, res) => {
-  return getUserFavoriteCollectionsNew(req, res);
+  return getUserFavoriteCollections(req, res);
 };
-
-const debugCollection = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const collection = await Collection.findById(id).populate({
-      path: "creator",
-      select: "username email _id",
-    });
-
-    if (!collection) {
-      return res.status(404).json({ error: "Collection not found" });
-    }
-
-    return res.status(200).json({
-      collection: {
-        _id: collection._id,
-        title: collection.title,
-        isPrivate: collection.isPrivate,
-        creator: collection.creator,
-      },
-      currentUser: req.user
-        ? {
-            _id: req.user._id,
-            username: req.user.username,
-            email: req.user.email,
-          }
-        : null,
-      ownershipCheck: req.user
-        ? isOwner(collection.creator._id, req.user._id)
-        : false,
-    });
-  } catch (error) {
-    console.error("Debug error:", error);
-    return res.status(500).json({ error: error.message });
-  }
-};
-
-module.exports.getCollectionsByUser = getCollectionsByUser;
-module.exports.getMyCollections = getMyCollections;
-module.exports.addFavoriteCollection = addFavoriteCollection;
-module.exports.removeFavoriteCollection = removeFavoriteCollection;
-module.exports.getFavoriteCollections = getFavoriteCollections;
-module.exports.debugCollection = debugCollection;
-
 
 const toggleLike = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-
     if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "ID de colección requerido" });
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
     }
 
     const collection = await Collection.findById(id);
@@ -705,7 +625,10 @@ const toggleLike = async (req, res) => {
         .json({ message: "Colección no encontrada" });
     }
 
-    let interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+    let interaction = await CollectionInteraction.findOne({
+      userId,
+      collectionId: id,
+    });
 
     if (!interaction) {
       interaction = new CollectionInteraction({ userId, collectionId: id });
@@ -724,22 +647,25 @@ const toggleLike = async (req, res) => {
       stats,
     });
   } catch (error) {
-    console.error("Error al actualizar like:", error);
+    console.error("Error al actualizar like de colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
-const toggleFavoriteNew = async (req, res) => {
+const toggleFavorite = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-
     if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "ID de colección requerido" });
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
     }
 
     const collection = await Collection.findById(id);
@@ -749,7 +675,10 @@ const toggleFavoriteNew = async (req, res) => {
         .json({ message: "Colección no encontrada" });
     }
 
-    let interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+    let interaction = await CollectionInteraction.findOne({
+      userId,
+      collectionId: id,
+    });
 
     if (!interaction) {
       interaction = new CollectionInteraction({ userId, collectionId: id });
@@ -768,7 +697,7 @@ const toggleFavoriteNew = async (req, res) => {
       stats,
     });
   } catch (error) {
-    console.error("Error al actualizar favorito:", error);
+    console.error("Error al actualizar favorito de colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -778,11 +707,14 @@ const toggleFavoriteNew = async (req, res) => {
 const getCollectionStatistics = async (req, res) => {
   try {
     const { id } = req.params;
-
     if (!id) {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
-        .json({ message: "ID de colección requerido" });
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
     }
 
     const stats = await getCollectionStats(id);
@@ -799,22 +731,34 @@ const getUserCollectionInteraction = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de colección inválido" });
+    }
 
-    const interaction = await CollectionInteraction.findOne({ userId, collectionId: id });
+    const interaction = await CollectionInteraction.findOne({
+      userId,
+      collectionId: id,
+    });
 
     return res.status(HTTP_RESPONSES.OK).json({
       liked: interaction?.liked || false,
       favorited: interaction?.favorited || false,
     });
   } catch (error) {
-    console.error("Error al obtener interacción:", error);
+    console.error("Error al obtener interacción con colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
-const getUserFavoriteCollectionsNew = async (req, res) => {
+const getUserFavoriteCollections = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -826,14 +770,17 @@ const getUserFavoriteCollectionsNew = async (req, res) => {
       })
         .populate({
           path: "collectionId",
-          populate: { 
+          populate: {
             path: "cards creator",
-            select: "username email" 
+            select: "username email",
           },
         })
         .sort({ favoritedAt: -1 });
     } catch (error) {
-      console.warn("Populate failed in getUserFavoriteCollections:", error.message);
+      console.warn(
+        "Populate failed in getUserFavoriteCollections:",
+        error.message
+      );
       favoriteInteractions = await CollectionInteraction.find({
         userId,
         favorited: true,
@@ -842,7 +789,7 @@ const getUserFavoriteCollectionsNew = async (req, res) => {
 
     const collections = favoriteInteractions
       .map((interaction) => interaction.collectionId)
-      .filter(collection => collection); // Filtrar nulls
+      .filter((collection) => collection);
 
     return res.status(HTTP_RESPONSES.OK).json(collections);
   } catch (error) {
@@ -865,8 +812,23 @@ const getCollectionStats = async (collectionId) => {
   };
 };
 
-module.exports.toggleLike = toggleLike;
-module.exports.toggleFavoriteNew = toggleFavoriteNew;
-module.exports.getCollectionStatistics = getCollectionStatistics;
-module.exports.getUserCollectionInteraction = getUserCollectionInteraction;
-module.exports.getUserFavoriteCollectionsNew = getUserFavoriteCollectionsNew;
+module.exports = {
+  getCollections,
+  getCollectionById,
+  getCollectionByTitle,
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  addCardToCollection,
+  removeCardFromCollection,
+  getCollectionsByUser,
+  getMyCollections,
+  addFavoriteCollection,
+  removeFavoriteCollection,
+  getFavoriteCollections,
+  toggleLike,
+  toggleFavorite,
+  getCollectionStatistics,
+  getUserCollectionInteraction,
+  getUserFavoriteCollections,
+};

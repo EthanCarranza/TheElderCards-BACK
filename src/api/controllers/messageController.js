@@ -1,6 +1,5 @@
 const Message = require("../models/message");
 const Friendship = require("../models/friendship");
-const User = require("../models/user");
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 
 const sendMessage = async (req, res) => {
@@ -93,20 +92,12 @@ const getConversation = async (req, res) => {
 
     if (!otherUserId) {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
-        message: "El ID del otro usuario es requerido",
+        message: "El Id del otro usuario es requerido",
       });
     }
-
-    const friendship = await Friendship.findOne({
-      $or: [
-        { requester: userId, recipient: otherUserId, status: "accepted" },
-        { requester: otherUserId, recipient: userId, status: "accepted" },
-      ],
-    });
-
-    if (!friendship) {
-      return res.status(HTTP_RESPONSES.FORBIDDEN).json({
-        message: "Solo puedes ver conversaciones con tus amigos",
+    if (userId === otherUserId) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "No puedes tener una conversación contigo mismo",
       });
     }
 
@@ -116,6 +107,12 @@ const getConversation = async (req, res) => {
       parseInt(page),
       parseInt(limit)
     );
+
+    if (!messages || messages.length === 0) {
+      return res.status(HTTP_RESPONSES.NOT_FOUND).json({
+        message: "La conversación no existe o no hay mensajes.",
+      });
+    }
 
     await Message.markAsRead(otherUserId, userId);
 
@@ -136,11 +133,7 @@ const getConversation = async (req, res) => {
 const getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
-
-    // Obtener conversaciones existentes (ya filtradas para usuarios que existen)
     const existingConversations = await Message.getUserConversations(userId);
-
-    // Obtener amistades activas
     const friendships = await Friendship.getFriends(userId);
 
     const existingConversationMap = new Map();
@@ -150,14 +143,11 @@ const getConversations = async (req, res) => {
 
     const allConversations = [...existingConversations];
 
-    // Añadir amigos que no tienen conversaciones activas
     friendships.forEach((friendship) => {
       const friend =
         friendship.requester._id.toString() === userId
           ? friendship.recipient
           : friendship.requester;
-
-      // Verificar que el amigo no sea null/undefined (por si hay problemas de populate)
       if (
         friend &&
         friend._id &&
@@ -196,23 +186,14 @@ const markMessagesAsRead = async (req, res) => {
 
     if (!senderId) {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
-        message: "El ID del remitente es requerido",
+        message: "El Id del remitente es requerido",
       });
     }
-
-    const friendship = await Friendship.findOne({
-      $or: [
-        { requester: userId, recipient: senderId, status: "accepted" },
-        { requester: senderId, recipient: userId, status: "accepted" },
-      ],
-    });
-
-    if (!friendship) {
-      return res.status(HTTP_RESPONSES.FORBIDDEN).json({
-        message: "Solo puedes marcar como leídos mensajes de tus amigos",
+    if (userId === senderId) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "No puedes tener una conversación contigo mismo",
       });
     }
-
     const modifiedCount = await Message.markAsRead(senderId, userId);
 
     return res.status(HTTP_RESPONSES.OK).json({
@@ -230,7 +211,6 @@ const markMessagesAsRead = async (req, res) => {
 const getUnreadCount = async (req, res) => {
   try {
     const userId = req.user.id;
-
     const unreadCount = await Message.getUnreadCount(userId);
 
     return res.status(HTTP_RESPONSES.OK).json({
@@ -244,81 +224,10 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
-const deleteMessage = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { messageId } = req.params;
-
-    const message = await Message.findById(messageId);
-    if (!message) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json({
-        message: "Mensaje no encontrado",
-      });
-    }
-
-    if (message.sender.toString() !== userId) {
-      return res.status(HTTP_RESPONSES.FORBIDDEN).json({
-        message: "Solo puedes eliminar tus propios mensajes",
-      });
-    }
-
-    await Message.findByIdAndDelete(messageId);
-
-    return res.status(HTTP_RESPONSES.OK).json({
-      message: "Mensaje eliminado correctamente",
-    });
-  } catch (error) {
-    console.error("Error al eliminar mensaje:", error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
-const cleanupOrphanedData = async (req, res) => {
-  try {
-    // Solo permitir a administradores ejecutar la limpieza
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(HTTP_RESPONSES.FORBIDDEN).json({
-        message:
-          "Solo los administradores pueden ejecutar la limpieza de datos",
-      });
-    }
-
-    console.log("Iniciando limpieza de datos huérfanos...");
-
-    // Limpiar mensajes huérfanos
-    const orphanedMessages = await Message.cleanupOrphanedMessages();
-
-    // Limpiar amistades huérfanas
-    const orphanedFriendships = await Friendship.cleanupOrphanedFriendships();
-
-    const result = {
-      message: "Limpieza de datos huérfanos completada",
-      deletedData: {
-        messages: orphanedMessages,
-        friendships: orphanedFriendships,
-      },
-      totalDeleted: orphanedMessages + orphanedFriendships,
-    };
-
-    console.log("Limpieza completada:", result);
-
-    return res.status(HTTP_RESPONSES.OK).json(result);
-  } catch (error) {
-    console.error("Error al limpiar datos huérfanos:", error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
 module.exports = {
   sendMessage,
   getConversation,
   getConversations,
   markMessagesAsRead,
   getUnreadCount,
-  deleteMessage,
-  cleanupOrphanedData,
 };

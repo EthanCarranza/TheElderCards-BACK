@@ -11,12 +11,11 @@ const {
   removeCardFromCollection,
   getCollectionsByUser,
   getMyCollections,
-  debugCollection,
   toggleLike,
-  toggleFavoriteNew,
+  toggleFavorite,
   getCollectionStatistics,
   getUserCollectionInteraction,
-  getUserFavoriteCollectionsNew,
+  getUserFavoriteCollections,
 } = require("../controllers/collectionController");
 const { uploadCollection } = require("../../middlewares/fileStorage");
 
@@ -25,7 +24,7 @@ const collectionRouter = express.Router();
 collectionRouter.get("/", optionalAuth, getCollections);
 collectionRouter.get("/by/user/:userId", optionalAuth, getCollectionsByUser);
 collectionRouter.get("/mine", isAuth, getMyCollections);
-collectionRouter.get("/favorites/mine", isAuth, getUserFavoriteCollectionsNew);
+collectionRouter.get("/favorites/mine", isAuth, getUserFavoriteCollections);
 collectionRouter.get("/get/:title", getCollectionByTitle);
 collectionRouter.get("/:id", optionalAuth, getCollectionById);
 collectionRouter.post(
@@ -43,10 +42,9 @@ collectionRouter.put(
 collectionRouter.delete("/:id", isAuth, deleteCollection);
 collectionRouter.put("/:id/addCard", isAuth, addCardToCollection);
 collectionRouter.put("/:id/removeCard", isAuth, removeCardFromCollection);
-collectionRouter.post("/:id/favorite", isAuth, toggleFavoriteNew);
+collectionRouter.post("/:id/favorite", isAuth, toggleFavorite);
 collectionRouter.post("/:id/like", isAuth, toggleLike);
 collectionRouter.get("/:id/stats", getCollectionStatistics);
 collectionRouter.get("/:id/interaction", isAuth, getUserCollectionInteraction);
-collectionRouter.get("/debug/:id", optionalAuth, debugCollection);
 
 module.exports = collectionRouter;

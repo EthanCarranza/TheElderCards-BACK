@@ -33,8 +33,13 @@ const collectionInteractionSchema = new mongoose.Schema(
   }
 );
 
-// Índice único para evitar duplicados de usuario-colección
-collectionInteractionSchema.index({ userId: 1, collectionId: 1 }, { unique: true });
+collectionInteractionSchema.index(
+  { userId: 1, collectionId: 1 },
+  { unique: true }
+);
 
-const CollectionInteraction = mongoose.model("CollectionInteraction", collectionInteractionSchema);
+const CollectionInteraction = mongoose.model(
+  "CollectionInteraction",
+  collectionInteractionSchema
+);
 module.exports = CollectionInteraction;

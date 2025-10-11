@@ -138,7 +138,7 @@ const respondFriendRequest = async (req, res) => {
       friendship,
     });
   } catch (error) {
-    console.error("Error al responder solicitud:", error);
+    console.error("Error al responder solicitud de amistad:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -192,7 +192,7 @@ const getPendingRequests = async (req, res) => {
       count: formattedRequests.length,
     });
   } catch (error) {
-    console.error("Error al obtener solicitudes:", error);
+    console.error("Error al obtener solicitudes de amistad pendientes:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -353,9 +353,8 @@ const searchUsers = async (req, res) => {
     let users;
 
     if (all === "true") {
-      users = await User.find({ _id: { $ne: userId } })
-        .select("username email image")
-        .limit(50);
+      users = await User.find({}).select("username email image").limit(50);
+      users = users.filter((u) => u._id.toString() !== userId);
     } else {
       if (!q || q.trim().length < 2) {
         return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
@@ -366,18 +365,14 @@ const searchUsers = async (req, res) => {
       const searchTerm = q.trim();
 
       users = await User.find({
-        $and: [
-          { _id: { $ne: userId } },
-          {
-            $or: [
-              { username: { $regex: searchTerm, $options: "i" } },
-              { email: { $regex: searchTerm, $options: "i" } },
-            ],
-          },
+        $or: [
+          { username: { $regex: searchTerm, $options: "i" } },
+          { email: { $regex: searchTerm, $options: "i" } },
         ],
       })
         .select("username email image")
         .limit(20);
+      users = users.filter((u) => u._id.toString() !== userId);
     }
 
     const usersWithStatus = await Promise.all(
@@ -446,22 +441,6 @@ const getBlockedUsers = async (req, res) => {
   }
 };
 
-const cleanupOrphanedFriendships = async (req, res) => {
-  try {
-    const cleanedCount = await Friendship.cleanupOrphanedFriendships();
-
-    return res.status(HTTP_RESPONSES.OK).json({
-      message: `Limpieza completada: ${cleanedCount} amistades huérfanas eliminadas`,
-      cleanedCount,
-    });
-  } catch (error) {
-    console.error("Error en limpieza de amistades:", error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
 module.exports = {
   sendFriendRequest,
   respondFriendRequest,
@@ -473,5 +452,4 @@ module.exports = {
   unblockUser,
   getBlockedUsers,
   searchUsers,
-  cleanupOrphanedFriendships,
 };

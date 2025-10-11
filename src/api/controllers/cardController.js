@@ -5,11 +5,11 @@ const Faction = require("../models/faction");
 const Collection = require("../models/collection");
 const CardInteraction = require("../models/cardInteraction");
 const { generateFramedImage } = require("../../utils/cardGenerator");
+const mongoose = require("mongoose");
 const fs = require("fs");
 
 const getCards = async (req, res, next) => {
   try {
-    console.log("Fetching cards with filters:", req.query);
     const {
       page = 1,
       limit = 20,
@@ -128,7 +128,7 @@ const getCards = async (req, res, next) => {
       totalPages: Math.ceil(total / parseInt(limit)),
     });
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener cartas:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -141,9 +141,11 @@ const getAllCards = async (req, res, next) => {
     if (cards.length !== 0) {
       return res.status(HTTP_RESPONSES.OK).json(cards);
     }
-    return res.status(HTTP_RESPONSES.NOT_FOUND).json("No hay cartas");
+    return res
+      .status(HTTP_RESPONSES.NOT_FOUND)
+      .json({ message: "No hay cartas" });
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener todas las cartas:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -152,11 +154,6 @@ const getAllCards = async (req, res, next) => {
 
 const createCard = async (req, res, next) => {
   try {
-    console.log("[createCard] INICIO DE FUNCIÓN");
-    console.log("[createCard] req.body:", req.body);
-    console.log("[createCard] req.file:", req.file);
-    console.log("[createCard] req.user:", req.user);
-    
     const {
       title,
       date,
@@ -169,12 +166,7 @@ const createCard = async (req, res, next) => {
       defense,
     } = req.body;
 
-    console.log("[createCard] Datos extraídos:", {
-      title, description, type, faction, cost, attack, defense
-    });
-
     if (!title || !description || !type || !faction || !cost) {
-      console.log("[createCard] ERROR: Faltan datos obligatorios");
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Faltan datos obligatorios" });
@@ -248,8 +240,8 @@ const createCard = async (req, res, next) => {
       typeof creatorName === "string" && creatorName.trim().length > 0
         ? creatorName.trim()
         : String(creatorName || "Anónimo");
-    console.log("[createCard] Iniciando generación de imagen...");
-    
+    console.log("Iniciando generación de imagen...");
+
     let imgUrl;
     try {
       imgUrl = await generateFramedImage(
@@ -263,34 +255,28 @@ const createCard = async (req, res, next) => {
         type === "Creature" ? parsedAttack : undefined,
         type === "Creature" ? parsedDefense : undefined
       );
-      console.log("[createCard] Imagen generada exitosamente:", imgUrl);
+      console.log("Imagen generada exitosamente:", imgUrl);
     } catch (imageError) {
-      console.error("[createCard] ERROR en generación de imagen:", imageError);
-      
-      // Eliminar la imagen subida si falló la generación
+      console.error("ERROR en generación de imagen:", imageError);
+
       try {
         await fs.promises.unlink(req.file.path);
       } catch (unlinkError) {
-        console.warn("[createCard] No se pudo eliminar imagen subida:", unlinkError);
+        console.error("No se pudo eliminar imagen subida:", unlinkError);
       }
-      
-      return res
-        .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-        .json({ 
-          message: "Error al generar la imagen de la carta", 
-          error: imageError.message,
-          details: "La imagen no pudo ser procesada correctamente. Verifica que el formato sea válido e inténtalo de nuevo."
-        });
+
+      return res.status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR).json({
+        message: "Error al generar la imagen de la carta",
+        error: imageError.message,
+        details:
+          "La imagen no pudo ser procesada correctamente. Verifica que el formato sea válido e inténtalo de nuevo.",
+      });
     }
 
     if (!imgUrl) {
-      console.log("[createCard] ERROR: No se obtuvo URL de imagen válida");
-      return res
-        .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-        .json({ 
-          message: "No se pudo generar la imagen de la carta",
-          details: "El proceso de generación no devolvió una URL válida."
-        });
+      return res.status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR).json({
+        message: "No se pudo generar la imagen de la carta",
+      });
     }
 
     const normalizedTitle =
@@ -320,25 +306,20 @@ const createCard = async (req, res, next) => {
       cardData.defense = parsedDefense;
     }
 
-    console.log("[createCard] Datos finales de la carta:", cardData);
-    console.log("[createCard] Intentando crear carta...");
-    
+    console.log("Intentando crear carta...");
+
     const savedCard = await Card.create(cardData);
-    console.log("[createCard] Carta creada exitosamente:", savedCard._id);
+    console.log("Carta creada exitosamente:", savedCard._id);
 
     try {
       await savedCard.populate("faction");
-      console.log("[createCard] Faction populate exitoso");
     } catch (error) {
       console.warn("Faction populate failed:", error.message);
     }
 
-    console.log("[createCard] Enviando respuesta...");
     return res.status(HTTP_RESPONSES.CREATED).json(savedCard);
   } catch (error) {
-    console.log("[createCard] ERROR COMPLETO:", error);
-    console.log("[createCard] ERROR MESSAGE:", error.message);
-    console.log("[createCard] ERROR STACK:", error.stack);
+    console.error("Error al crear carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: "Error interno del servidor", error: error.message });
@@ -349,18 +330,13 @@ const mockCreateCard = createCard;
 
 const testCreateCard = async (req, res, next) => {
   try {
-    console.log("[testCreateCard] Iniciando prueba de creación de carta");
-    
-    // Buscar una facción existente
+    console.log("Iniciando prueba de creación de carta");
     const faction = await Faction.findOne();
     if (!faction) {
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ 
-        message: "No hay facciones disponibles para crear una carta de prueba" 
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "No hay facciones disponibles para crear una carta de prueba",
       });
     }
-    
-    console.log("[testCreateCard] Facción encontrada:", faction._id);
-    
     const testCardData = {
       title: "Carta de Prueba " + Date.now(),
       description: "Esta es una carta de prueba creada para debugging",
@@ -371,21 +347,21 @@ const testCreateCard = async (req, res, next) => {
       creator: "Sistema de Prueba",
       date: new Date(),
     };
-    
-    console.log("[testCreateCard] Datos de carta de prueba:", testCardData);
-    
+
+    console.log("Datos de carta de prueba:", testCardData);
+
     const savedCard = await Card.create(testCardData);
-    console.log("[testCreateCard] Carta de prueba creada:", savedCard._id);
-    
+    console.log("Carta de prueba creada:", savedCard._id);
+
     return res.status(HTTP_RESPONSES.CREATED).json({
       message: "Carta de prueba creada exitosamente",
-      card: savedCard
+      card: savedCard,
     });
   } catch (error) {
-    console.log("[testCreateCard] ERROR:", error);
+    console.error("Error al crear carta de prueba:", error);
     return res.status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR).json({
       message: "Error al crear carta de prueba",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -394,11 +370,13 @@ const getCardById = async (req, res, next) => {
   try {
     const card = await Card.findById(req.params.id);
     if (!card) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Carta no encontrada");
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Carta no encontrada" });
     }
     return res.status(HTTP_RESPONSES.OK).json(card);
   } catch (error) {
-    console.log(error);
+    console.error("Error al obtener carta por Id:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -411,11 +389,13 @@ const updateCard = async (req, res, next) => {
       new: true,
     });
     if (!card) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Carta no encontrada");
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Carta no encontrada" });
     }
     return res.status(HTTP_RESPONSES.OK).json(card);
   } catch (error) {
-    console.log(error);
+    console.error("Error al actualizar carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -425,10 +405,21 @@ const updateCard = async (req, res, next) => {
 const deleteCard = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const card = await Card.findById(id);
+    if (!id) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de carta requerido" });
+    } else if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(HTTP_RESPONSES.BAD_REQUEST)
+        .json({ message: "Id de carta inválido" });
+    }
 
+    const card = await Card.findById(id);
     if (!card) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Carta no encontrada");
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Carta no encontrada" });
     }
 
     const userCreator = req.user?.username || req.user?.email || "Anónimo";
@@ -446,7 +437,7 @@ const deleteCard = async (req, res, next) => {
       .status(HTTP_RESPONSES.OK)
       .json({ message: "Carta eliminada correctamente" });
   } catch (error) {
-    console.log(error);
+    console.error("Error al eliminar carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -462,19 +453,19 @@ const addToCollection = async (req, res, next) => {
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
+        .json({ message: "Colección no encontrada" });
     }
     if (collection.creator.toString() !== userId.toString()) {
       return res
-        .status(HTTP_RESPONSES.FORBIDDEN || 403)
-        .json("No tienes permiso para modificar esta colección");
+        .status(HTTP_RESPONSES.FORBIDDEN)
+        .json({ message: "No tienes permiso para modificar esta colección" });
     }
     const alreadyIn = collection.cards
       .map((id) => id.toString())
       .includes(cardId);
     if (alreadyIn) {
       return res
-        .status(HTTP_RESPONSES.CONFLICT || 409)
+        .status(HTTP_RESPONSES.CONFLICT)
         .json({ message: "La carta ya está en la colección" });
     }
     collection.cards.push(cardId);
@@ -483,7 +474,7 @@ const addToCollection = async (req, res, next) => {
       .status(HTTP_RESPONSES.OK)
       .json({ cards: collection.cards, added: true });
   } catch (error) {
-    console.log(error);
+    console.error("Error al agregar carta a colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -499,12 +490,12 @@ const removeFromCollection = async (req, res, next) => {
     if (!collection) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
-        .json("Colección no encontrada");
+        .json({ message: "Colección no encontrada" });
     }
     if (collection.creator.toString() !== userId.toString()) {
       return res
-        .status(HTTP_RESPONSES.FORBIDDEN || 403)
-        .json("No tienes permiso para modificar esta colección");
+        .status(HTTP_RESPONSES.FORBIDDEN)
+        .json({ message: "No tienes permiso para modificar esta colección" });
     }
     const wasIn = collection.cards.map((id) => id.toString()).includes(cardId);
     let removed = false;
@@ -519,7 +510,7 @@ const removeFromCollection = async (req, res, next) => {
       .status(HTTP_RESPONSES.OK)
       .json({ cards: collection.cards, removed });
   } catch (error) {
-    console.log(error);
+    console.error("Error al quitar carta de colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -532,7 +523,9 @@ const addToFavorites = async (req, res, next) => {
     const { cardId } = req.body;
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Usuario no encontrado");
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Usuario no encontrado" });
     }
     if (!user.favorites.includes(cardId)) {
       user.favorites.push(cardId);
@@ -540,7 +533,7 @@ const addToFavorites = async (req, res, next) => {
     }
     return res.status(HTTP_RESPONSES.OK).json(user.favorites);
   } catch (error) {
-    console.log(error);
+    console.error("Error al agregar carta a favoritos:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -553,13 +546,15 @@ const removeFromFavorites = async (req, res, next) => {
     const { cardId } = req.body;
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(HTTP_RESPONSES.NOT_FOUND).json("Usuario no encontrado");
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Usuario no encontrado" });
     }
     user.favorites = user.favorites.filter((id) => id.toString() !== cardId);
     await user.save();
     return res.status(HTTP_RESPONSES.OK).json(user.favorites);
   } catch (error) {
-    console.log(error);
+    console.error("Error al quitar carta de favoritos:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -577,7 +572,6 @@ module.exports = {
   removeFromCollection,
   addToFavorites,
   removeFromFavorites,
-
   mockCreateCard,
   testCreateCard,
 };

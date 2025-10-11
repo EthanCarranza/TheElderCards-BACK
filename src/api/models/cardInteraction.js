@@ -33,8 +33,10 @@ const cardInteractionSchema = new mongoose.Schema(
   }
 );
 
-// Índice único para evitar duplicados de usuario-carta
 cardInteractionSchema.index({ userId: 1, cardId: 1 }, { unique: true });
 
-const CardInteraction = mongoose.model("CardInteraction", cardInteractionSchema);
+const CardInteraction = mongoose.model(
+  "CardInteraction",
+  cardInteractionSchema
+);
 module.exports = CardInteraction;
