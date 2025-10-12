@@ -30,6 +30,7 @@ const getCollections = async (req, res, next) => {
       user: userId,
       favorites,
       liked,
+      myCollections,
       ...filters
     } = req.query;
 
@@ -85,6 +86,10 @@ const getCollections = async (req, res, next) => {
       } else {
         collectionIds = likedIds;
       }
+    }
+
+    if (myCollections === "true" && userId) {
+      query.creator = userId;
     }
 
     if (collectionIds !== null) {

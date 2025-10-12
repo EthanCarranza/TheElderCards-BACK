@@ -17,6 +17,7 @@ const getCards = async (req, res, next) => {
       user: userId,
       favorites,
       liked,
+      myCards,
       ...filters
     } = req.query;
     const query = {};
@@ -57,6 +58,14 @@ const getCards = async (req, res, next) => {
         );
       } else {
         cardIds = likedIds;
+      }
+    }
+
+    if (myCards === "true" && userId) {
+      const userCreator = await User.findById(userId).select("username email");
+      if (userCreator) {
+        const creatorName = userCreator.username || userCreator.email;
+        query.creator = creatorName;
       }
     }
 
