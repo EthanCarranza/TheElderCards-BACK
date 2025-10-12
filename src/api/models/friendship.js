@@ -25,11 +25,6 @@ const friendshipSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  message: {
-    type: String,
-    maxlength: 200,
-    trim: true,
-  },
 });
 
 friendshipSchema.index({ requester: 1, recipient: 1 }, { unique: true });

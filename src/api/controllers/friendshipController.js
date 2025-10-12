@@ -4,7 +4,7 @@ const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 
 const sendFriendRequest = async (req, res) => {
   try {
-    const { recipientId, message } = req.body;
+    const { recipientId } = req.body;
     const requesterId = req.user.id;
 
     if (requesterId === recipientId) {
@@ -39,7 +39,6 @@ const sendFriendRequest = async (req, res) => {
     const friendship = new Friendship({
       requester: requesterId,
       recipient: recipientId,
-      message: message || "",
       status: "pending",
     });
 
@@ -128,13 +127,13 @@ const respondFriendRequest = async (req, res) => {
       }
     }
 
-    const message =
+    const responseMsg =
       action === "accept"
         ? "Solicitud de amistad aceptada"
         : "Solicitud de amistad rechazada";
 
     return res.status(HTTP_RESPONSES.OK).json({
-      message,
+      message: responseMsg,
       friendship,
     });
   } catch (error) {

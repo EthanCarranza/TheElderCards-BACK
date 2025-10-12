@@ -188,7 +188,6 @@ const getCollections = async (req, res, next) => {
       })
     );
 
-        isPrivate: true,
     const total = await Collection.countDocuments(query);
 
     return res.status(HTTP_RESPONSES.OK).json({

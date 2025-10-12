@@ -34,7 +34,6 @@ const getCards = async (req, res, next) => {
     }
 
     let cardIds = null;
-
     if (favorites === "true" && userId) {
       const favoriteInteractions = await CardInteraction.find({
         userId,
