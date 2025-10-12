@@ -326,6 +326,13 @@ const createCollection = async (req, res, next) => {
 
     return res.status(HTTP_RESPONSES.CREATED).json(populatedCollection);
   } catch (error) {
+    if (error && error.name === "ValidationError") {
+      const message =
+        Object.values(error.errors || {})
+          .map((e) => e.message)
+          .join("; ") || "Datos inválidos";
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ message });
+    }
     console.error("Error al crear colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
@@ -506,6 +513,13 @@ const updateCollection = async (req, res, next) => {
         runValidators: true,
       });
     } catch (error) {
+      if (error && error.name === "ValidationError") {
+        const message =
+          Object.values(error.errors || {})
+            .map((e) => e.message)
+            .join("; ") || "Datos inválidos";
+        return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ message });
+      }
       return res
         .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
         .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);

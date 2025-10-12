@@ -3,12 +3,16 @@ const mongoose = require("mongoose");
 const collectionSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    description: { type: String, trim: true },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: [1000, "La descripción no puede superar los 1000 caracteres"],
+    },
     img: { type: String, trim: true },
-    creator: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: "users", 
-      required: true 
+    creator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
+      required: true,
     },
     isPrivate: { type: Boolean, default: false },
     cards: [
