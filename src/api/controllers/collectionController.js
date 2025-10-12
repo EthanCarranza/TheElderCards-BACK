@@ -23,8 +23,153 @@ const isOwner = (creatorId, userId) => {
 
 const getCollections = async (req, res, next) => {
   try {
-    let collections = await Collection.find({ isPrivate: false })
-      .populate("cards")
+    const {
+      page = 1,
+      limit = 20,
+      sort,
+      user: userId,
+      favorites,
+      liked,
+      ...filters
+    } = req.query;
+
+    const query = { isPrivate: false };
+
+    if (filters.title) query.title = { $regex: filters.title, $options: "i" };
+    if (filters.creator) {
+      const User = require("../models/user");
+      const users = await User.find({
+        $or: [
+          { username: { $regex: filters.creator, $options: "i" } },
+          { email: { $regex: filters.creator, $options: "i" } },
+        ],
+      }).select("_id");
+
+      if (users.length > 0) {
+        query.creator = { $in: users.map((u) => u._id) };
+      } else {
+        return res.status(HTTP_RESPONSES.OK).json({
+          collections: [],
+          total: 0,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: 0,
+        });
+      }
+    }
+
+    let collectionIds = null;
+    if (favorites === "true" && userId) {
+      const favoriteInteractions = await CollectionInteraction.find({
+        userId,
+        favorited: true,
+      }).select("collectionId");
+      collectionIds = favoriteInteractions.map(
+        (interaction) => interaction.collectionId
+      );
+    }
+
+    if (liked === "true" && userId) {
+      const likedInteractions = await CollectionInteraction.find({
+        userId,
+        liked: true,
+      }).select("collectionId");
+      const likedIds = likedInteractions.map(
+        (interaction) => interaction.collectionId
+      );
+
+      if (collectionIds) {
+        collectionIds = collectionIds.filter((id) =>
+          likedIds.some((likedId) => likedId.toString() === id.toString())
+        );
+      } else {
+        collectionIds = likedIds;
+      }
+    }
+
+    if (collectionIds !== null) {
+      query._id = { $in: collectionIds };
+    }
+
+    if (req.user) {
+      const userIdObj = req.user._id;
+      query.$or = [
+        { isPrivate: false },
+        { isPrivate: true, creator: userIdObj },
+      ];
+      delete query.isPrivate;
+    }
+
+    let sortObj = {};
+    if (sort) {
+      if (sort === "most_liked") {
+        const pipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: "collectioninteractions",
+              localField: "_id",
+              foreignField: "collectionId",
+              as: "interactions",
+            },
+          },
+          {
+            $addFields: {
+              likesCount: {
+                $size: {
+                  $filter: {
+                    input: "$interactions",
+                    cond: { $eq: ["$$this.liked", true] },
+                  },
+                },
+              },
+            },
+          },
+          { $sort: { likesCount: -1 } },
+          { $skip: (parseInt(page) - 1) * parseInt(limit) },
+          { $limit: parseInt(limit) },
+        ];
+
+        const collections = await Collection.aggregate(pipeline);
+        const total = await Collection.countDocuments(query);
+
+        const populatedCollections = await Promise.all(
+          collections.map(async (collection) => {
+            try {
+              const populated = await Collection.findById(collection._id)
+                .populate("creator", "username email")
+                .populate("cards")
+                .exec();
+              return populated;
+            } catch (error) {
+              const collectionObj = await Collection.findById(collection._id);
+              const obj = collectionObj.toObject();
+              obj.creator = DELETED_USER_PLACEHOLDER;
+              return obj;
+            }
+          })
+        );
+
+        return res.status(HTTP_RESPONSES.OK).json({
+          collections: populatedCollections,
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / parseInt(limit)),
+        });
+      } else {
+        const [field, direction] = sort.split("_");
+        sortObj[field] = direction === "desc" ? -1 : 1;
+      }
+    } else {
+      sortObj = { createdAt: -1 };
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    let collections = await Collection.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
       .exec();
 
     collections = await Promise.all(
@@ -43,35 +188,16 @@ const getCollections = async (req, res, next) => {
       })
     );
 
-    if (req.user) {
-      const userId = req.user._id;
-      let privateCollections = await Collection.find({
-        creator: userId,
         isPrivate: true,
-      })
-        .populate("cards")
-        .exec();
+    const total = await Collection.countDocuments(query);
 
-      privateCollections = await Promise.all(
-        privateCollections.map(async (collection) => {
-          let populatedCollection;
-          try {
-            populatedCollection = await Collection.findById(collection._id)
-              .populate("creator", "username email")
-              .populate("cards")
-              .exec();
-          } catch (error) {
-            populatedCollection = collection.toObject();
-            populatedCollection.creator = DELETED_USER_PLACEHOLDER;
-          }
-          return populatedCollection;
-        })
-      );
-
-      collections = [...collections, ...privateCollections];
-    }
-
-    return res.status(HTTP_RESPONSES.OK).json(collections);
+    return res.status(HTTP_RESPONSES.OK).json({
+      collections,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit)),
+    });
   } catch (error) {
     console.error("Error al obtener colecciones:", error);
     return res

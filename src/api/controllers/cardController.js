@@ -17,7 +17,6 @@ const getCards = async (req, res, next) => {
       user: userId,
       favorites,
       liked,
-      mostLiked,
       ...filters
     } = req.query;
     const query = {};
