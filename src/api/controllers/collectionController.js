@@ -300,11 +300,22 @@ const createCollection = async (req, res, next) => {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Titulo faltante" });
+    } else if (title.length > 40) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El título no puede superar los 40 caracteres",
+      });
+    }
+
+    const description = req.body.description || "";
+    if (description.length > 1000) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "La descripción no puede superar los 1000 caracteres",
+      });
     }
 
     const newCollection = new Collection({
       title,
-      description: req.body.description || "",
+      description,
       img: req.file ? req.file.path : null,
       creator: req.user._id,
       isPrivate: req.body.isPrivate === true || req.body.isPrivate === "true",
@@ -326,13 +337,6 @@ const createCollection = async (req, res, next) => {
 
     return res.status(HTTP_RESPONSES.CREATED).json(populatedCollection);
   } catch (error) {
-    if (error && error.name === "ValidationError") {
-      const message =
-        Object.values(error.errors || {})
-          .map((e) => e.message)
-          .join("; ") || "Datos inválidos";
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ message });
-    }
     console.error("Error al crear colección:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
@@ -474,10 +478,22 @@ const updateCollection = async (req, res, next) => {
     }
 
     const title = (req.body.title || "").trim();
+    if (title && title.length > 40) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El título no puede superar los 40 caracteres",
+      });
+    }
+
     const description =
       req.body.description !== undefined
         ? req.body.description.trim()
         : undefined;
+
+    if (description && description.length > 1000) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "La descripción no puede superar los 1000 caracteres",
+      });
+    }
     const isPrivate =
       req.body.isPrivate === true || req.body.isPrivate === "true";
 
@@ -510,16 +526,8 @@ const updateCollection = async (req, res, next) => {
     try {
       updatedCollection = await Collection.findByIdAndUpdate(id, updateData, {
         new: true,
-        runValidators: true,
       });
     } catch (error) {
-      if (error && error.name === "ValidationError") {
-        const message =
-          Object.values(error.errors || {})
-            .map((e) => e.message)
-            .join("; ") || "Datos inválidos";
-        return res.status(HTTP_RESPONSES.BAD_REQUEST).json({ message });
-      }
       return res
         .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
         .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);

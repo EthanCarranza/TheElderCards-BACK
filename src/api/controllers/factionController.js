@@ -15,6 +15,22 @@ const createFaction = async (req, res, next) => {
       });
     }
 
+    if (title && title.length > 40) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El título no puede superar los 40 caracteres",
+      });
+    }
+    if (description && description.length > 1000) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "La descripción no puede superar los 1000 caracteres",
+      });
+    }
+    if (territory && territory.length > 40) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El territorio no puede superar los 40 caracteres",
+      });
+    }
+
     const nameExists = await Faction.findOne({ title });
     if (nameExists) {
       return res
@@ -153,6 +169,22 @@ const updateFaction = async (req, res, next) => {
       });
     }
 
+    if (title && title.length > 40) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El título no puede superar los 40 caracteres",
+      });
+    }
+    if (description && description.length > 1000) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "La descripción no puede superar los 1000 caracteres",
+      });
+    }
+    if (territory && territory.length > 40) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El territorio no puede superar los 40 caracteres",
+      });
+    }
+
     const updateData = {};
     if (title !== undefined && title !== faccion.title) {
       const nameExists = await Faction.findOne({ title });
@@ -185,7 +217,6 @@ const updateFaction = async (req, res, next) => {
 
     const updatedFaction = await Faction.findByIdAndUpdate(id, updateData, {
       new: true,
-      runValidators: true,
     });
     if (updatedFaction) {
       return res.status(HTTP_RESPONSES.OK).json(updatedFaction);

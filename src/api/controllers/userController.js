@@ -235,7 +235,7 @@ const updateUser = async (req, res) => {
     const userUpdated = await User.findByIdAndUpdate(
       id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { new: true }
     );
 
     if (!userUpdated) {
