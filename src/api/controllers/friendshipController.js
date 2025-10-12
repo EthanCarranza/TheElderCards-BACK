@@ -1,6 +1,11 @@
 const Friendship = require("../models/friendship");
 const User = require("../models/user");
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
+const { 
+  emitNewFriendRequest, 
+  emitFriendRequestResponse,
+  emitPendingRequestUpdate 
+} = require("../../config/socket");
 
 const sendFriendRequest = async (req, res) => {
   try {
@@ -59,6 +64,25 @@ const sendFriendRequest = async (req, res) => {
       ) {
         friendship.recipient = DELETED_USER_PLACEHOLDER;
       }
+    }
+
+    // Emitir evento WebSocket para nueva solicitud de amistad
+    try {
+      emitNewFriendRequest(recipientId, {
+        friendshipId: friendship._id,
+        requester: friendship.requester,
+        message: friendship.message,
+        createdAt: friendship.createdAt,
+      });
+
+      // Actualizar conteo de solicitudes pendientes para el destinatario
+      const pendingCount = await Friendship.countDocuments({
+        recipient: recipientId,
+        status: "pending",
+      });
+      emitPendingRequestUpdate(recipientId, pendingCount);
+    } catch (socketError) {
+      console.warn("Error emitiendo evento WebSocket:", socketError);
     }
 
     return res.status(HTTP_RESPONSES.CREATED).json({
@@ -131,6 +155,25 @@ const respondFriendRequest = async (req, res) => {
       action === "accept"
         ? "Solicitud de amistad aceptada"
         : "Solicitud de amistad rechazada";
+
+    // Emitir eventos WebSocket
+    try {
+      // Notificar al solicitante sobre la respuesta
+      emitFriendRequestResponse(friendship.requester._id || friendship.requester, {
+        action,
+        recipient: req.user,
+        friendship,
+      });
+
+      // Actualizar conteo de solicitudes pendientes para el destinatario
+      const pendingCount = await Friendship.countDocuments({
+        recipient: userId,
+        status: "pending",
+      });
+      emitPendingRequestUpdate(userId, pendingCount);
+    } catch (socketError) {
+      console.warn("Error emitiendo evento WebSocket:", socketError);
+    }
 
     return res.status(HTTP_RESPONSES.OK).json({
       message: responseMsg,

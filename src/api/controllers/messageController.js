@@ -1,6 +1,10 @@
 const Message = require("../models/message");
 const Friendship = require("../models/friendship");
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
+const { 
+  emitNewMessage, 
+  emitUnreadCountUpdate 
+} = require("../../config/socket");
 
 const sendMessage = async (req, res) => {
   try {
@@ -72,6 +76,22 @@ const sendMessage = async (req, res) => {
       }
     }
 
+    // Emitir evento WebSocket para nuevo mensaje
+    try {
+      emitNewMessage(recipientId, {
+        _id: message._id,
+        content: message.content,
+        sender: message.sender,
+        createdAt: message.createdAt,
+      });
+
+      // Actualizar conteo de mensajes no leídos para el destinatario
+      const unreadCount = await Message.getUnreadCount(recipientId);
+      emitUnreadCountUpdate(recipientId, unreadCount);
+    } catch (socketError) {
+      console.warn("Error emitiendo evento WebSocket:", socketError);
+    }
+
     return res.status(HTTP_RESPONSES.CREATED).json({
       message: "Mensaje enviado correctamente",
       data: message,
@@ -115,6 +135,14 @@ const getConversation = async (req, res) => {
     }
 
     await Message.markAsRead(otherUserId, userId);
+
+    // Emitir actualización de conteo de mensajes no leídos
+    try {
+      const unreadCount = await Message.getUnreadCount(userId);
+      emitUnreadCountUpdate(userId, unreadCount);
+    } catch (socketError) {
+      console.warn("Error emitiendo actualización de conteo:", socketError);
+    }
 
     return res.status(HTTP_RESPONSES.OK).json({
       messages,
