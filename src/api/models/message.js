@@ -81,6 +81,9 @@ messageSchema.statics.getUserConversations = async function (userId) {
       },
     },
     {
+      $sort: { createdAt: -1 },
+    },
+    {
       $group: {
         _id: "$otherUser",
         lastMessage: { $first: "$$ROOT" },
