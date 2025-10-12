@@ -158,7 +158,9 @@ const getCollections = async (req, res, next) => {
           totalPages: Math.ceil(total / parseInt(limit)),
         });
       } else {
-        const [field, direction] = sort.split("_");
+        let field = sort.split("_")[0];
+        let direction = sort.split("_")[1];
+        if (field === "date") field = "createdAt";
         sortObj[field] = direction === "desc" ? -1 : 1;
       }
     } else {
