@@ -5,6 +5,7 @@ const {
   emitNewFriendRequest,
   emitFriendRequestResponse,
   emitPendingRequestUpdate,
+  emitFriendshipRemoved,
 } = require("../../config/socket");
 
 const sendFriendRequest = async (req, res) => {
@@ -292,6 +293,38 @@ const removeFriendship = async (req, res) => {
       message = isRequester ? "Solicitud cancelada" : "Solicitud eliminada";
     } else if (friendship.status === "accepted") {
       message = "Amistad eliminada";
+    }
+
+    try {
+      const otherUserId = isRequester
+        ? friendship.recipient.toString()
+        : friendship.requester.toString();
+
+      emitFriendshipRemoved(userId, {
+        friendshipId,
+        byUserId: userId,
+        status: friendship.status,
+      });
+
+      emitFriendshipRemoved(otherUserId, {
+        friendshipId,
+        byUserId: userId,
+        status: friendship.status,
+      });
+
+      if (friendship.status === "pending") {
+        const [pendingCountActor, pendingCountOther] = await Promise.all([
+          Friendship.countDocuments({ recipient: userId, status: "pending" }),
+          Friendship.countDocuments({
+            recipient: otherUserId,
+            status: "pending",
+          }),
+        ]);
+        emitPendingRequestUpdate(userId, pendingCountActor);
+        emitPendingRequestUpdate(otherUserId, pendingCountOther);
+      }
+    } catch (socketError) {
+      console.warn("Error emitiendo evento friendship_removed:", socketError);
     }
 
     return res.status(HTTP_RESPONSES.OK).json({ message });
