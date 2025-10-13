@@ -130,7 +130,6 @@ const login = async (req, res) => {
         .json({ message: "Email/usuario y/o contrasena faltantes" });
     }
     const normalizedInput = email.trim();
-    console.log("Buscando usuario con:", normalizedInput);
 
     const user = await User.findOne({
       $or: [

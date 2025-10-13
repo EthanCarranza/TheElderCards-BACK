@@ -463,7 +463,10 @@ const searchUsers = async (req, res) => {
                 ? "sent"
                 : "received";
           } else if (relationship.status === "blocked") {
-            relationshipStatus = "blocked";
+            relationshipStatus =
+              relationship.requester.toString() === userId
+                ? "blocked"
+                : "blocked_by";
           }
         }
 
