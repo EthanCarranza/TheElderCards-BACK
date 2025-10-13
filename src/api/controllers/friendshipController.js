@@ -1,10 +1,10 @@
 const Friendship = require("../models/friendship");
 const User = require("../models/user");
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
-const { 
-  emitNewFriendRequest, 
+const {
+  emitNewFriendRequest,
   emitFriendRequestResponse,
-  emitPendingRequestUpdate 
+  emitPendingRequestUpdate,
 } = require("../../config/socket");
 
 const sendFriendRequest = async (req, res) => {
@@ -66,7 +66,6 @@ const sendFriendRequest = async (req, res) => {
       }
     }
 
-    // Emitir evento WebSocket para nueva solicitud de amistad
     try {
       emitNewFriendRequest(recipientId, {
         friendshipId: friendship._id,
@@ -75,7 +74,6 @@ const sendFriendRequest = async (req, res) => {
         createdAt: friendship.createdAt,
       });
 
-      // Actualizar conteo de solicitudes pendientes para el destinatario
       const pendingCount = await Friendship.countDocuments({
         recipient: recipientId,
         status: "pending",
@@ -124,31 +122,32 @@ const respondFriendRequest = async (req, res) => {
 
     if (action === "accept") {
       friendship.status = "accepted";
+      await friendship.save();
+
+      try {
+        await friendship.populate("requester", "username email image");
+      } catch (error) {
+        console.warn(
+          "Requester populate failed in respondFriendRequest:",
+          error.message
+        );
+        const {
+          DELETED_USER_PLACEHOLDER,
+        } = require("../../utils/safePopulate");
+        if (
+          !friendship.requester ||
+          (typeof friendship.requester === "object" &&
+            !friendship.requester.username)
+        ) {
+          friendship.requester = DELETED_USER_PLACEHOLDER;
+        }
+      }
     } else if (action === "decline") {
-      friendship.status = "declined";
+      await Friendship.findByIdAndDelete(friendshipId);
     } else {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
         message: "Acción no válida. Usar 'accept' o 'decline'",
       });
-    }
-
-    await friendship.save();
-
-    try {
-      await friendship.populate("requester", "username email image");
-    } catch (error) {
-      console.warn(
-        "Requester populate failed in respondFriendRequest:",
-        error.message
-      );
-      const { DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
-      if (
-        !friendship.requester ||
-        (typeof friendship.requester === "object" &&
-          !friendship.requester.username)
-      ) {
-        friendship.requester = DELETED_USER_PLACEHOLDER;
-      }
     }
 
     const responseMsg =
@@ -156,16 +155,16 @@ const respondFriendRequest = async (req, res) => {
         ? "Solicitud de amistad aceptada"
         : "Solicitud de amistad rechazada";
 
-    // Emitir eventos WebSocket
     try {
-      // Notificar al solicitante sobre la respuesta
-      emitFriendRequestResponse(friendship.requester._id || friendship.requester, {
-        action,
-        recipient: req.user,
-        friendship,
-      });
+      emitFriendRequestResponse(
+        friendship.requester._id || friendship.requester,
+        {
+          action,
+          recipient: req.user,
+          friendship,
+        }
+      );
 
-      // Actualizar conteo de solicitudes pendientes para el destinatario
       const pendingCount = await Friendship.countDocuments({
         recipient: userId,
         status: "pending",
