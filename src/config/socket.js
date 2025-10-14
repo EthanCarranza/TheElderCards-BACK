@@ -10,6 +10,8 @@ const initializeSocket = (server) => {
       origin: "*",
       credentials: true,
     },
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
   });
 
   io.use(async (socket, next) => {

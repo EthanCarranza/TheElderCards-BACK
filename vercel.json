@@ -1,14 +1,34 @@
 {
+  "functions": {
+    "index.js": {
+      "maxDuration": 10
+    },
+    "api/socket.js": {
+      "maxDuration": 30
+    }
+  },
   "builds": [
     {
       "src": "./index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "./api/socket.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
+      "src": "/api/socket.io/(.*)",
+      "dest": "/api/socket.js"
+    },
+    {
+      "src": "/socket.io/(.*)",
+      "dest": "/api/socket.js"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/"
+      "dest": "/index.js"
     }
   ]
 }
