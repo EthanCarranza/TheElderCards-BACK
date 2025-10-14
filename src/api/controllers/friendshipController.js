@@ -518,6 +518,49 @@ const getBlockedUsers = async (req, res) => {
   }
 };
 
+const getRelationshipStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { userId: otherUserId } = req.params;
+
+    if (!otherUserId) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El Id del otro usuario es requerido",
+      });
+    }
+
+    if (userId === otherUserId) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El Id no puede ser tu propio Id",
+      });
+    }
+
+    const relationship = await Friendship.getRelationship(userId, otherUserId);
+
+    let status = "none";
+    if (relationship) {
+      if (relationship.status === "accepted") {
+        status = "friends";
+      } else if (relationship.status === "pending") {
+        status =
+          relationship.requester.toString() === userId ? "sent" : "received";
+      } else if (relationship.status === "blocked") {
+        status =
+          relationship.requester.toString() === userId
+            ? "blocked"
+            : "blocked_by";
+      }
+    }
+
+    return res.status(HTTP_RESPONSES.OK).json({ status });
+  } catch (error) {
+    console.error("Error al obtener estado de relación:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
 module.exports = {
   sendFriendRequest,
   respondFriendRequest,
@@ -529,4 +572,5 @@ module.exports = {
   unblockUser,
   getBlockedUsers,
   searchUsers,
+  getRelationshipStatus,
 };
