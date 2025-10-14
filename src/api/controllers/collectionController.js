@@ -97,10 +97,21 @@ const getCollections = async (req, res, next) => {
     }
 
     if (req.user) {
-      const userIdObj = req.user._id;
+      const Friendship = require("../models/friendship");
+      const blockingRelationships = await Friendship.find({
+        $or: [
+          { recipient: req.user._id, status: "blocked" },
+          { requester: req.user._id, status: "blocked" },
+        ],
+      }).select("requester recipient");
+      const blockingUserIds = blockingRelationships.map((rel) =>
+        rel.requester.toString() === req.user._id.toString()
+          ? rel.recipient
+          : rel.requester
+      );
       query.$or = [
-        { isPrivate: false },
-        { isPrivate: true, creator: userIdObj },
+        { isPrivate: false, creator: { $nin: blockingUserIds } },
+        { isPrivate: true, creator: req.user._id },
       ];
       delete query.isPrivate;
     }
@@ -108,8 +119,9 @@ const getCollections = async (req, res, next) => {
     let sortObj = {};
     if (sort) {
       if (sort === "most_liked") {
+        let matchQuery = { ...query };
         const pipeline = [
-          { $match: query },
+          { $match: matchQuery },
           {
             $lookup: {
               from: "collectioninteractions",
@@ -136,7 +148,7 @@ const getCollections = async (req, res, next) => {
         ];
 
         const collections = await Collection.aggregate(pipeline);
-        const total = await Collection.countDocuments(query);
+        const total = await Collection.countDocuments(matchQuery);
 
         const populatedCollections = await Promise.all(
           collections.map(async (collection) => {
@@ -233,6 +245,21 @@ const getCollectionById = async (req, res, next) => {
     }
 
     const creatorId = collection.creator;
+    if (req.user && req.user._id.toString() !== creatorId.toString()) {
+      const Friendship = require("../models/friendship");
+      const blockingRelationship = await Friendship.findOne({
+        requester: creatorId,
+        recipient: req.user._id,
+        status: "blocked",
+      });
+
+      if (blockingRelationship) {
+        return res
+          .status(HTTP_RESPONSES.FORBIDDEN)
+          .json({ message: "No tienes permiso para ver esta colección" });
+      }
+    }
+
     if (
       collection.isPrivate &&
       (!req.user || !isOwner(creatorId, req.user._id))
@@ -606,6 +633,18 @@ const getCollectionsByUser = async (req, res) => {
       return res
         .status(HTTP_RESPONSES.BAD_REQUEST)
         .json({ message: "Id de usuario invalido" });
+    }
+    if (req.user && req.user._id.toString() !== userId) {
+      const Friendship = require("../models/friendship");
+      const blockingRelationship = await Friendship.findOne({
+        requester: userId,
+        recipient: req.user._id,
+        status: "blocked",
+      });
+
+      if (blockingRelationship) {
+        return res.status(HTTP_RESPONSES.OK).json([]);
+      }
     }
 
     let collections;

@@ -11,6 +11,7 @@ const {
   unblockUser,
   getBlockedUsers,
   searchUsers,
+  getRelationshipStatus,
 } = require("../controllers/friendshipController");
 const { isAuth } = require("../../middlewares/auth");
 
@@ -24,5 +25,6 @@ router.delete("/:friendshipId", isAuth, removeFriendship);
 router.post("/block/:userId", isAuth, blockUser);
 router.delete("/block/:userId", isAuth, unblockUser);
 router.get("/blocked", isAuth, getBlockedUsers);
+router.get("/status/:userId", isAuth, getRelationshipStatus);
 
 module.exports = router;

@@ -1,9 +1,8 @@
 const express = require("express");
-const { isAuth } = require("../../middlewares/auth");
+const { isAuth, optionalAuth } = require("../../middlewares/auth");
 const { uploadCard } = require("../../middlewares/fileStorage");
 const {
   getCards,
-  getAllCards,
   createCard,
   getCardById,
   updateCard,
@@ -15,8 +14,7 @@ const {
 } = require("../controllers/cardController");
 const router = express.Router();
 
-router.get("/", getCards);
-router.get("/all", getAllCards);
+router.get("/", optionalAuth, getCards);
 router.get("/:id", getCardById);
 router.post("/", isAuth, uploadCard.single("img"), createCard);
 //router.put("/:id", isAuth, uploadCard.single("img"), updateCard);

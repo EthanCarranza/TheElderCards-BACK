@@ -26,6 +26,44 @@ const getCards = async (req, res, next) => {
     if (filters.faction) query.faction = filters.faction;
     if (filters.title) query.title = { $regex: filters.title, $options: "i" };
     if (filters.creator) {
+      if (req.user) {
+        const creatorUser = await User.findOne({
+          $or: [
+            { username: { $regex: filters.creator, $options: "i" } },
+            { email: { $regex: filters.creator, $options: "i" } },
+          ],
+        }).select("_id");
+
+        if (
+          creatorUser &&
+          creatorUser._id.toString() !== req.user._id.toString()
+        ) {
+          const Friendship = require("../models/friendship");
+          const blockingRelationship = await Friendship.findOne({
+            $or: [
+              {
+                requester: creatorUser._id,
+                recipient: req.user._id,
+                status: "blocked",
+              },
+              {
+                requester: req.user._id,
+                recipient: creatorUser._id,
+                status: "blocked",
+              },
+            ],
+          });
+          if (blockingRelationship) {
+            return res.status(HTTP_RESPONSES.OK).json({
+              cards: [],
+              total: 0,
+              page: parseInt(page),
+              limit: parseInt(limit),
+              totalPages: 0,
+            });
+          }
+        }
+      }
       query.creator = { $regex: filters.creator, $options: "i" };
     }
     if (filters.cost) query.cost = filters.cost;
@@ -73,11 +111,106 @@ const getCards = async (req, res, next) => {
       query._id = { $in: cardIds };
     }
 
+    if (req.user) {
+      const Friendship = require("../models/friendship");
+      const blockingRelationships = await Friendship.find({
+        $or: [
+          { recipient: req.user._id, status: "blocked" },
+          { requester: req.user._id, status: "blocked" },
+        ],
+      }).select("requester recipient");
+      const blockingUserIds = blockingRelationships.map((rel) =>
+        rel.requester.toString() === req.user._id.toString()
+          ? rel.recipient
+          : rel.requester
+      );
+      if (blockingUserIds.length > 0) {
+        const blockingUsers = await User.find({
+          _id: { $in: blockingUserIds },
+        }).select("username email");
+        const blockingCreators = blockingUsers
+          .flatMap((user) => [user.username, user.email])
+          .filter(Boolean);
+        if (blockingCreators.length > 0) {
+          if (!query.creator) {
+            query.creator = { $nin: blockingCreators };
+          } else if (query.creator.$in) {
+            query.creator.$nin = blockingCreators;
+          } else if (query.creator.$regex) {
+            query.$and = [
+              {
+                creator: {
+                  $regex: query.creator.$regex,
+                  $options: query.creator.$options,
+                },
+              },
+              { creator: { $nin: blockingCreators } },
+            ];
+            delete query.creator;
+          } else if (typeof query.creator === "string") {
+            query.$and = [
+              { creator: query.creator },
+              { creator: { $nin: blockingCreators } },
+            ];
+            delete query.creator;
+          }
+        }
+      }
+    }
+
     let sortObj = {};
     if (sort) {
       if (sort === "most_liked") {
+        let matchQuery = { ...query };
+        if (req.user) {
+          const Friendship = require("../models/friendship");
+          const blockingRelationships = await Friendship.find({
+            $or: [
+              { recipient: req.user._id, status: "blocked" },
+              { requester: req.user._id, status: "blocked" },
+            ],
+          }).select("requester recipient");
+          const blockingUserIds = blockingRelationships.map((rel) =>
+            rel.requester.toString() === req.user._id.toString()
+              ? rel.recipient
+              : rel.requester
+          );
+          if (blockingUserIds.length > 0) {
+            const blockingUsers = await User.find({
+              _id: { $in: blockingUserIds },
+            }).select("username email");
+            const blockingCreators = blockingUsers
+              .flatMap((user) => [user.username, user.email])
+              .filter(Boolean);
+            if (blockingCreators.length > 0) {
+              if (!matchQuery.creator) {
+                matchQuery.creator = { $nin: blockingCreators };
+              } else if (matchQuery.creator.$in) {
+                matchQuery.creator.$nin = blockingCreators;
+              } else if (matchQuery.creator.$regex) {
+                matchQuery.$and = [
+                  {
+                    creator: {
+                      $regex: matchQuery.creator.$regex,
+                      $options: matchQuery.creator.$options,
+                    },
+                  },
+                  { creator: { $nin: blockingCreators } },
+                ];
+                delete matchQuery.creator;
+              } else if (typeof matchQuery.creator === "string") {
+                matchQuery.$and = [
+                  { creator: matchQuery.creator },
+                  { creator: { $nin: blockingCreators } },
+                ];
+                delete matchQuery.creator;
+              }
+            }
+          }
+        }
+
         const pipeline = [
-          { $match: query },
+          { $match: matchQuery },
           {
             $lookup: {
               from: "cardinteractions",
@@ -104,7 +237,7 @@ const getCards = async (req, res, next) => {
         ];
 
         const cards = await Card.aggregate(pipeline);
-        const total = await Card.countDocuments(query);
+        const total = await Card.countDocuments(matchQuery);
 
         return res.status(HTTP_RESPONSES.OK).json({
           cards,
@@ -136,23 +269,6 @@ const getCards = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error al obtener cartas:", error);
-    return res
-      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
-  }
-};
-
-const getAllCards = async (req, res, next) => {
-  try {
-    const cards = await Card.find();
-    if (cards.length !== 0) {
-      return res.status(HTTP_RESPONSES.OK).json(cards);
-    }
-    return res
-      .status(HTTP_RESPONSES.NOT_FOUND)
-      .json({ message: "No hay cartas" });
-  } catch (error) {
-    console.error("Error al obtener todas las cartas:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
@@ -330,46 +446,6 @@ const createCard = async (req, res, next) => {
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
       .json({ message: "Error interno del servidor", error: error.message });
-  }
-};
-
-const mockCreateCard = createCard;
-
-const testCreateCard = async (req, res, next) => {
-  try {
-    console.log("Iniciando prueba de creación de carta");
-    const faction = await Faction.findOne();
-    if (!faction) {
-      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
-        message: "No hay facciones disponibles para crear una carta de prueba",
-      });
-    }
-    const testCardData = {
-      title: "Carta de Prueba " + Date.now(),
-      description: "Esta es una carta de prueba creada para debugging",
-      type: "Spell",
-      cost: 3,
-      faction: faction._id,
-      img: "https://via.placeholder.com/400x600/ff0000/ffffff?text=Test+Card",
-      creator: "Sistema de Prueba",
-      date: new Date(),
-    };
-
-    console.log("Datos de carta de prueba:", testCardData);
-
-    const savedCard = await Card.create(testCardData);
-    console.log("Carta de prueba creada:", savedCard._id);
-
-    return res.status(HTTP_RESPONSES.CREATED).json({
-      message: "Carta de prueba creada exitosamente",
-      card: savedCard,
-    });
-  } catch (error) {
-    console.error("Error al crear carta de prueba:", error);
-    return res.status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR).json({
-      message: "Error al crear carta de prueba",
-      error: error.message,
-    });
   }
 };
 
@@ -570,7 +646,6 @@ const removeFromFavorites = async (req, res, next) => {
 
 module.exports = {
   getCards,
-  getAllCards,
   createCard,
   getCardById,
   updateCard,
@@ -579,6 +654,4 @@ module.exports = {
   removeFromCollection,
   addToFavorites,
   removeFromFavorites,
-  mockCreateCard,
-  testCreateCard,
 };

@@ -1,6 +1,12 @@
 const Friendship = require("../models/friendship");
 const User = require("../models/user");
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
+const {
+  emitNewFriendRequest,
+  emitFriendRequestResponse,
+  emitPendingRequestUpdate,
+  emitFriendshipRemoved,
+} = require("../../config/socket");
 
 const sendFriendRequest = async (req, res) => {
   try {
@@ -61,6 +67,23 @@ const sendFriendRequest = async (req, res) => {
       }
     }
 
+    try {
+      emitNewFriendRequest(recipientId, {
+        friendshipId: friendship._id,
+        requester: friendship.requester,
+        message: friendship.message,
+        createdAt: friendship.createdAt,
+      });
+
+      const pendingCount = await Friendship.countDocuments({
+        recipient: recipientId,
+        status: "pending",
+      });
+      emitPendingRequestUpdate(recipientId, pendingCount);
+    } catch (socketError) {
+      console.warn("Error emitiendo evento WebSocket:", socketError);
+    }
+
     return res.status(HTTP_RESPONSES.CREATED).json({
       message: "Solicitud de amistad enviada",
       friendship,
@@ -100,37 +123,57 @@ const respondFriendRequest = async (req, res) => {
 
     if (action === "accept") {
       friendship.status = "accepted";
+      await friendship.save();
+
+      try {
+        await friendship.populate("requester", "username email image");
+      } catch (error) {
+        console.warn(
+          "Requester populate failed in respondFriendRequest:",
+          error.message
+        );
+        const {
+          DELETED_USER_PLACEHOLDER,
+        } = require("../../utils/safePopulate");
+        if (
+          !friendship.requester ||
+          (typeof friendship.requester === "object" &&
+            !friendship.requester.username)
+        ) {
+          friendship.requester = DELETED_USER_PLACEHOLDER;
+        }
+      }
     } else if (action === "decline") {
-      friendship.status = "declined";
+      await Friendship.findByIdAndDelete(friendshipId);
     } else {
       return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
         message: "Acción no válida. Usar 'accept' o 'decline'",
       });
     }
 
-    await friendship.save();
-
-    try {
-      await friendship.populate("requester", "username email image");
-    } catch (error) {
-      console.warn(
-        "Requester populate failed in respondFriendRequest:",
-        error.message
-      );
-      const { DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
-      if (
-        !friendship.requester ||
-        (typeof friendship.requester === "object" &&
-          !friendship.requester.username)
-      ) {
-        friendship.requester = DELETED_USER_PLACEHOLDER;
-      }
-    }
-
     const responseMsg =
       action === "accept"
         ? "Solicitud de amistad aceptada"
         : "Solicitud de amistad rechazada";
+
+    try {
+      emitFriendRequestResponse(
+        friendship.requester._id || friendship.requester,
+        {
+          action,
+          recipient: req.user,
+          friendship,
+        }
+      );
+
+      const pendingCount = await Friendship.countDocuments({
+        recipient: userId,
+        status: "pending",
+      });
+      emitPendingRequestUpdate(userId, pendingCount);
+    } catch (socketError) {
+      console.warn("Error emitiendo evento WebSocket:", socketError);
+    }
 
     return res.status(HTTP_RESPONSES.OK).json({
       message: responseMsg,
@@ -250,6 +293,38 @@ const removeFriendship = async (req, res) => {
       message = isRequester ? "Solicitud cancelada" : "Solicitud eliminada";
     } else if (friendship.status === "accepted") {
       message = "Amistad eliminada";
+    }
+
+    try {
+      const otherUserId = isRequester
+        ? friendship.recipient.toString()
+        : friendship.requester.toString();
+
+      emitFriendshipRemoved(userId, {
+        friendshipId,
+        byUserId: userId,
+        status: friendship.status,
+      });
+
+      emitFriendshipRemoved(otherUserId, {
+        friendshipId,
+        byUserId: userId,
+        status: friendship.status,
+      });
+
+      if (friendship.status === "pending") {
+        const [pendingCountActor, pendingCountOther] = await Promise.all([
+          Friendship.countDocuments({ recipient: userId, status: "pending" }),
+          Friendship.countDocuments({
+            recipient: otherUserId,
+            status: "pending",
+          }),
+        ]);
+        emitPendingRequestUpdate(userId, pendingCountActor);
+        emitPendingRequestUpdate(otherUserId, pendingCountOther);
+      }
+    } catch (socketError) {
+      console.warn("Error emitiendo evento friendship_removed:", socketError);
     }
 
     return res.status(HTTP_RESPONSES.OK).json({ message });
@@ -388,7 +463,10 @@ const searchUsers = async (req, res) => {
                 ? "sent"
                 : "received";
           } else if (relationship.status === "blocked") {
-            relationshipStatus = "blocked";
+            relationshipStatus =
+              relationship.requester.toString() === userId
+                ? "blocked"
+                : "blocked_by";
           }
         }
 
@@ -440,6 +518,49 @@ const getBlockedUsers = async (req, res) => {
   }
 };
 
+const getRelationshipStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { userId: otherUserId } = req.params;
+
+    if (!otherUserId) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El Id del otro usuario es requerido",
+      });
+    }
+
+    if (userId === otherUserId) {
+      return res.status(HTTP_RESPONSES.BAD_REQUEST).json({
+        message: "El Id no puede ser tu propio Id",
+      });
+    }
+
+    const relationship = await Friendship.getRelationship(userId, otherUserId);
+
+    let status = "none";
+    if (relationship) {
+      if (relationship.status === "accepted") {
+        status = "friends";
+      } else if (relationship.status === "pending") {
+        status =
+          relationship.requester.toString() === userId ? "sent" : "received";
+      } else if (relationship.status === "blocked") {
+        status =
+          relationship.requester.toString() === userId
+            ? "blocked"
+            : "blocked_by";
+      }
+    }
+
+    return res.status(HTTP_RESPONSES.OK).json({ status });
+  } catch (error) {
+    console.error("Error al obtener estado de relación:", error);
+    return res
+      .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
+  }
+};
+
 module.exports = {
   sendFriendRequest,
   respondFriendRequest,
@@ -451,4 +572,5 @@ module.exports = {
   unblockUser,
   getBlockedUsers,
   searchUsers,
+  getRelationshipStatus,
 };

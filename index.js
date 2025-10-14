@@ -1,6 +1,8 @@
 require("dotenv").config();
 const express = require("express");
+const http = require("http");
 const { connectDB } = require("./src/config/dataBase");
+const { initializeSocket } = require("./src/config/socket");
 const usersRouter = require("./src/api/routes/userRoute");
 const cardsRouter = require("./src/api/routes/cardRoute");
 const collectionRouter = require("./src/api/routes/collectionRoute");
@@ -12,6 +14,7 @@ const messageRouter = require("./src/api/routes/messageRoute");
 const cloudinary = require("cloudinary").v2;
 const cors = require("cors");
 const app = express();
+const server = http.createServer(app);
 
 connectDB();
 
@@ -62,10 +65,15 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+// Inicializar Socket.IO
+const io = initializeSocket(server);
+
 app.use("*", (req, res, next) => {
   return res.status(404).json("Route Not Found");
 });
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log("Socket.IO initialized");
 });
