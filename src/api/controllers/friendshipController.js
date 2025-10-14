@@ -6,6 +6,7 @@ const {
   emitFriendRequestResponse,
   emitPendingRequestUpdate,
   emitFriendshipRemoved,
+  emitUserBlocked,
 } = require("../../config/socket");
 
 const sendFriendRequest = async (req, res) => {
@@ -68,6 +69,7 @@ const sendFriendRequest = async (req, res) => {
     }
 
     try {
+      await friendship.populate("requester", "username email image");
       emitNewFriendRequest(recipientId, {
         friendshipId: friendship._id,
         requester: friendship.requester,
@@ -300,15 +302,25 @@ const removeFriendship = async (req, res) => {
         ? friendship.recipient.toString()
         : friendship.requester.toString();
 
+      const removerUser = await User.findById(userId).select(
+        "username email image"
+      );
+
       emitFriendshipRemoved(userId, {
         friendshipId,
         byUserId: userId,
+        byUsername: removerUser?.username || "",
+        byEmail: removerUser?.email || "",
+        byImage: removerUser?.image || "",
         status: friendship.status,
       });
 
       emitFriendshipRemoved(otherUserId, {
         friendshipId,
         byUserId: userId,
+        byUsername: removerUser?.username || "",
+        byEmail: removerUser?.email || "",
+        byImage: removerUser?.image || "",
         status: friendship.status,
       });
 
@@ -374,6 +386,20 @@ const blockUser = async (req, res) => {
         status: "blocked",
       });
       await friendship.save();
+    }
+
+    try {
+      const blockerUser = await User.findById(userId).select("username email image");
+      
+      emitUserBlocked(targetUserId, {
+        friendshipId: friendship._id,
+        blockedBy: userId,
+        blockedByUsername: blockerUser?.username || "",
+        blockedByEmail: blockerUser?.email || "",
+        blockedByImage: blockerUser?.image || "",
+      });
+    } catch (socketError) {
+      console.warn("Error emitiendo evento user_blocked:", socketError);
     }
 
     return res.status(HTTP_RESPONSES.OK).json({

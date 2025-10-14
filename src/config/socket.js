@@ -108,6 +108,10 @@ const emitFriendshipRemoved = (userId, payload) => {
   emitToUser(userId, "friendship_removed", payload);
 };
 
+const emitUserBlocked = (blockedUserId, payload) => {
+  emitToUser(blockedUserId, "user_blocked", payload);
+};
+
 module.exports = {
   initializeSocket,
   getSocketIO,
@@ -118,4 +122,5 @@ module.exports = {
   emitNewFriendRequest,
   emitFriendRequestResponse,
   emitFriendshipRemoved,
+  emitUserBlocked,
 };
