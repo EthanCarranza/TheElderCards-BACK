@@ -31,7 +31,6 @@ const initializeSocket = (server) => {
       socket.user = user;
       next();
     } catch (error) {
-      console.error("Error de autenticación WebSocket:", error);
       next(new Error("Token inválido"));
     }
   });
@@ -58,14 +57,11 @@ const initializeSocket = (server) => {
           pendingCount,
         });
       } catch (error) {
-        console.error("Error al obtener conteos iniciales:", error);
         socket.emit("notification_error", "Error al cargar notificaciones");
       }
     });
 
-    socket.on("disconnect", () => {
-      console.log(`Usuario desconectado: ${socket.user.username}`);
-    });
+    socket.on("disconnect", () => {});
   });
 
   return io;
