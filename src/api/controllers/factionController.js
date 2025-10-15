@@ -1,4 +1,5 @@
 const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
+const { deleteImageFromCloudinary } = require("../../utils/cloudinaryHelper");
 const Faction = require("../models/faction");
 const mongoose = require("mongoose");
 
@@ -207,7 +208,16 @@ const updateFaction = async (req, res, next) => {
       updateData.color = color;
     }
     if (req.body.img !== undefined) updateData.img = req.body.img;
-    if (req.file && req.file.path) updateData.img = req.file.path;
+    if (req.file && req.file.path) {
+      if (faccion.img) {
+        try {
+          await deleteImageFromCloudinary(faccion.img);
+        } catch (err) {
+          console.warn("No se pudo eliminar la imagen anterior de Cloudinary:", err);
+        }
+      }
+      updateData.img = req.file.path;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return res
