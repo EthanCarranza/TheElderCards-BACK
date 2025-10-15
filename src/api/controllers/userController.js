@@ -3,6 +3,7 @@ const { HTTP_RESPONSES, HTTP_MESSAGES } = require("../models/httpResponses");
 const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const mongoose = require("mongoose");
+const { deleteImageFromCloudinary } = require("../../utils/cloudinaryHelper");
 
 const DEFAULT_PROFILE_IMAGE =
   User.DEFAULT_PROFILE_IMAGE ||
@@ -276,6 +277,21 @@ const updateImage = async (req, res) => {
         .json({ message: "Imagen no proporcionada" });
     }
 
+    const existingUser = await User.findById(id);
+    if (!existingUser) {
+      return res
+        .status(HTTP_RESPONSES.NOT_FOUND)
+        .json({ message: "Usuario no encontrado" });
+    }
+
+    if (
+      existingUser.image &&
+      existingUser.image !== DEFAULT_PROFILE_IMAGE &&
+      !existingUser.image.includes("pixabay.com")
+    ) {
+      await deleteImageFromCloudinary(existingUser.image);
+    }
+
     const img = req.file.path;
     const userUpdated = await User.findByIdAndUpdate(
       id,
@@ -331,6 +347,28 @@ const deleteUser = async (req, res) => {
 
     console.log(
       `Iniciando eliminación completa del usuario: ${user.username} (${id})`
+    );
+
+    if (
+      user.image &&
+      user.image !== DEFAULT_PROFILE_IMAGE &&
+      !user.image.includes("pixabay.com")
+    ) {
+      await deleteImageFromCloudinary(user.image);
+      console.log(`Imagen de perfil eliminada de Cloudinary`);
+    }
+
+    const userCards = await Card.find({
+      $or: [{ creator: user.username }, { creator: user.email }],
+    });
+
+    for (const card of userCards) {
+      if (card.img) {
+        await deleteImageFromCloudinary(card.img);
+      }
+    }
+    console.log(
+      `Imágenes de ${userCards.length} cartas eliminadas de Cloudinary`
     );
 
     const deletedCards = await Card.deleteMany({

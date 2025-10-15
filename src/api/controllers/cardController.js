@@ -5,6 +5,7 @@ const Faction = require("../models/faction");
 const Collection = require("../models/collection");
 const CardInteraction = require("../models/cardInteraction");
 const { generateFramedImage } = require("../../utils/cardGenerator");
+const { deleteImageFromCloudinary } = require("../../utils/cloudinaryHelper");
 const mongoose = require("mongoose");
 const fs = require("fs");
 
@@ -468,14 +469,25 @@ const getCardById = async (req, res, next) => {
 
 const updateCard = async (req, res, next) => {
   try {
-    const card = await Card.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    if (!card) {
+    const { id } = req.params;
+
+    const existingCard = await Card.findById(id);
+    if (!existingCard) {
       return res
         .status(HTTP_RESPONSES.NOT_FOUND)
         .json({ message: "Carta no encontrada" });
     }
+
+    if (req.body.img && req.body.img !== existingCard.img) {
+      if (existingCard.img) {
+        await deleteImageFromCloudinary(existingCard.img);
+      }
+    }
+
+    const card = await Card.findByIdAndUpdate(id, req.body, {
+      new: true,
+    });
+
     return res.status(HTTP_RESPONSES.OK).json(card);
   } catch (error) {
     console.error("Error al actualizar carta:", error);
@@ -515,7 +527,15 @@ const deleteCard = async (req, res, next) => {
         .json({ message: "No tienes permiso para eliminar esta carta" });
     }
 
+    if (card.img) {
+      await deleteImageFromCloudinary(card.img);
+    }
+
+    // Eliminar la carta de la base de datos
     await Card.findByIdAndDelete(id);
+
+    await Collection.updateMany({ cards: id }, { $pull: { cards: id } });
+
     return res
       .status(HTTP_RESPONSES.OK)
       .json({ message: "Carta eliminada correctamente" });
