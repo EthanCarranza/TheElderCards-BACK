@@ -558,7 +558,10 @@ const updateCollection = async (req, res, next) => {
         try {
           await deleteImageFromCloudinary(collection.img);
         } catch (err) {
-          console.warn("No se pudo eliminar la imagen anterior de Cloudinary:", err);
+          console.warn(
+            "No se pudo eliminar la imagen anterior de Cloudinary:",
+            err
+          );
         }
       }
       updateData.img = req.file.path;
@@ -616,10 +619,21 @@ const deleteCollection = async (req, res, next) => {
     }
 
     const userId = req.user._id.toString();
-    if (collection.creator.toString() !== userId) {
-      return res
-        .status(HTTP_RESPONSES.FORBIDDEN)
-        .json({ message: "No tienes permiso para eliminar esta colección" });
+    const isAdmin = req.user?.role === "admin";
+    if (collection.isPrivate) {
+      if (!isOwner) {
+        return res
+          .status(HTTP_RESPONSES.FORBIDDEN)
+          .json({
+            message: "No tienes permiso para eliminar esta colección privada",
+          });
+      }
+    } else {
+      if (!isOwner && !isAdmin) {
+        return res
+          .status(HTTP_RESPONSES.FORBIDDEN)
+          .json({ message: "No tienes permiso para eliminar esta colección" });
+      }
     }
 
     if (collection.img) {
