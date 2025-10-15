@@ -272,6 +272,13 @@ const deleteFaction = async (req, res, next) => {
       });
     }
 
+    if (faction.img) {
+      try {
+        await deleteImageFromCloudinary(faction.img);
+      } catch (err) {
+        console.warn("No se pudo eliminar la imagen de Cloudinary:", err);
+      }
+    }
     await Faction.findByIdAndDelete(id);
     return res
       .status(HTTP_RESPONSES.OK)
