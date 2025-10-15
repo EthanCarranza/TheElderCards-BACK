@@ -622,6 +622,13 @@ const deleteCollection = async (req, res, next) => {
         .json({ message: "No tienes permiso para eliminar esta colección" });
     }
 
+    if (collection.img) {
+      try {
+        await deleteImageFromCloudinary(collection.img);
+      } catch (err) {
+        console.warn("No se pudo eliminar la imagen de Cloudinary:", err);
+      }
+    }
     await Collection.findByIdAndDelete(id);
     return res
       .status(HTTP_RESPONSES.OK)
