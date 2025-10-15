@@ -3,6 +3,7 @@ const Collection = require("../models/collection");
 const CollectionInteraction = require("../models/collectionInteraction");
 const mongoose = require("mongoose");
 const { DELETED_USER_PLACEHOLDER } = require("../../utils/safePopulate");
+const { deleteImageFromCloudinary } = require("../../utils/cloudinaryHelper");
 
 const isOwner = (creatorId, userId) => {
   if (!creatorId || !userId) return false;
@@ -553,6 +554,13 @@ const updateCollection = async (req, res, next) => {
     }
     updateData.isPrivate = isPrivate;
     if (req.file && req.file.path) {
+      if (collection.img) {
+        try {
+          await deleteImageFromCloudinary(collection.img);
+        } catch (err) {
+          console.warn("No se pudo eliminar la imagen anterior de Cloudinary:", err);
+        }
+      }
       updateData.img = req.file.path;
     }
 
