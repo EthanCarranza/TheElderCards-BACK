@@ -35,17 +35,28 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    const friendship = await Friendship.findOne({
-      $or: [
-        { requester: senderId, recipient: recipientId, status: "accepted" },
-        { requester: recipientId, recipient: senderId, status: "accepted" },
-      ],
-    });
-
-    if (!friendship) {
-      return res.status(HTTP_RESPONSES.FORBIDDEN).json({
-        message: "Solo puedes enviar mensajes a tus amigos",
+    const senderRole = req.user.role;
+    let isAdmin = false;
+    if (
+      senderRole &&
+      typeof senderRole === "string" &&
+      senderRole.toLowerCase() === "admin"
+    ) {
+      isAdmin = true;
+    }
+    let friendship = null;
+    if (!isAdmin) {
+      friendship = await Friendship.findOne({
+        $or: [
+          { requester: senderId, recipient: recipientId, status: "accepted" },
+          { requester: recipientId, recipient: senderId, status: "accepted" },
+        ],
       });
+      if (!friendship) {
+        return res.status(HTTP_RESPONSES.FORBIDDEN).json({
+          message: "Solo puedes enviar mensajes a tus amigos",
+        });
+      }
     }
 
     const message = new Message({
