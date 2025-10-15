@@ -7,9 +7,18 @@ let io;
 const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: "*",
+      origin: [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        process.env.CLIENT_URL,
+      ].filter(Boolean),
       credentials: true,
+      methods: ["GET", "POST"],
     },
+    transports: ["websocket", "polling"],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   io.use(async (socket, next) => {
@@ -36,7 +45,7 @@ const initializeSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
-    //console.log(`Usuario conectado: ${socket.user.username} (${socket.userId})`);
+    console.log(`✅ Usuario conectado: ${socket.user.username || socket.user.email} (${socket.userId})`);
 
     socket.join(`user_${socket.userId}`);
     socket.on("request_initial_counts", async () => {
@@ -61,9 +70,12 @@ const initializeSocket = (server) => {
       }
     });
 
-    socket.on("disconnect", () => {});
+    socket.on("disconnect", (reason) => {
+      console.log(`❌ Usuario desconectado: ${socket.userId} (${reason})`);
+    });
   });
 
+  console.log("✅ Socket.IO configurado correctamente");
   return io;
 };
 

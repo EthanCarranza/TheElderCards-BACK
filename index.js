@@ -24,7 +24,17 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
 });
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      process.env.CLIENT_URL,
+    ].filter(Boolean),
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  })
+);
 app.use(express.json());
 
 app.use("/api/v1/users", usersRouter);
@@ -34,6 +44,14 @@ app.use("/api/v1/factions", factionsRouter);
 app.use("/api/v1/card-interactions", cardInteractionRouter);
 app.use("/api/v1/friendships", friendshipRouter);
 app.use("/api/v1/messages", messageRouter);
+
+app.get("/", (req, res) => {
+  res.json({
+    message: "The Elder Cards API",
+    status: "running",
+    version: "1.0.0",
+  });
+});
 
 // Health check endpoint
 app.get("/api/health", async (req, res) => {
@@ -73,7 +91,8 @@ app.use("*", (req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log("Socket.IO initialized");
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`📡 Socket.IO initialized`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
 });
