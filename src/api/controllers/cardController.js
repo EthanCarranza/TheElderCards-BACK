@@ -435,6 +435,15 @@ const createCard = async (req, res, next) => {
     const savedCard = await Card.create(cardData);
     console.log("Carta creada exitosamente:", savedCard._id);
 
+    if (req.file && req.file.path) {
+      try {
+        await deleteImageFromCloudinary(req.file.path);
+        console.log("Imagen temporal eliminada de Cloudinary:", req.file.path);
+      } catch (cleanupError) {
+        console.warn("No se pudo eliminar la imagen temporal de Cloudinary:", cleanupError.message);
+      }
+    }
+
     try {
       await savedCard.populate("faction");
     } catch (error) {
