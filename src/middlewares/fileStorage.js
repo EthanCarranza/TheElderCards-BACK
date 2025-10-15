@@ -2,10 +2,11 @@ const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-const profileStorage = new CloudinaryStorage({
+
+const userStorage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "ProfileImages",
+    folder: "users",
     allowedFormats: ["jpg", "png", "jpeg", "gif", "webp"],
   },
 });
@@ -13,7 +14,7 @@ const profileStorage = new CloudinaryStorage({
 const cardStorage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "Cards",
+    folder: "cards",
     allowedFormats: ["jpg", "png", "jpeg", "gif", "webp"],
   },
 });
@@ -21,7 +22,7 @@ const cardStorage = new CloudinaryStorage({
 const collectionStorage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "Collections",
+    folder: "collections",
     allowedFormats: ["jpg", "png", "jpeg", "gif", "webp"],
   },
 });
@@ -29,19 +30,29 @@ const collectionStorage = new CloudinaryStorage({
 const factionStorage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "Factions",
+    folder: "factions",
     allowedFormats: ["jpg", "png", "jpeg", "gif", "webp"],
   },
 });
 
-const uploadProfile = multer({ storage: profileStorage });
+const tempStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "temp",
+    allowedFormats: ["jpg", "png", "jpeg", "gif", "webp"],
+  },
+});
+
+const uploadUser = multer({ storage: userStorage });
 const uploadCard = multer({ storage: cardStorage });
 const uploadCollection = multer({ storage: collectionStorage });
 const uploadFaction = multer({ storage: factionStorage });
+const uploadTemp = multer({ storage: tempStorage });
 
 module.exports = {
-  uploadProfile,
+  uploadUser,
   uploadCard,
   uploadCollection,
   uploadFaction,
+  uploadTemp,
 };
