@@ -212,8 +212,11 @@ const updateFaction = async (req, res, next) => {
       if (faccion.img) {
         try {
           await deleteImageFromCloudinary(faccion.img);
-        } catch (err) {
-          console.warn("No se pudo eliminar la imagen anterior de Cloudinary:", err);
+        } catch (error) {
+          console.error(
+            "No se pudo eliminar la imagen anterior de Cloudinary:",
+            error
+          );
         }
       }
       updateData.img = req.file.path;
@@ -275,8 +278,8 @@ const deleteFaction = async (req, res, next) => {
     if (faction.img) {
       try {
         await deleteImageFromCloudinary(faction.img);
-      } catch (err) {
-        console.warn("No se pudo eliminar la imagen de Cloudinary:", err);
+      } catch (error) {
+        console.error("No se pudo eliminar la imagen de Cloudinary:", error);
       }
     }
     await Faction.findByIdAndDelete(id);

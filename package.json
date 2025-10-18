@@ -11,18 +11,21 @@
     },
     "dependencies": {
         "@napi-rs/canvas": "^0.1.80",
+        "adm-zip": "^0.5.16",
         "axios": "^1.11.0",
         "bcrypt": "^5.1.1",
         "cloudinary": "^1.41.3",
         "cors": "^2.8.5",
         "dotenv": "^16.4.5",
         "express": "^4.21.1",
+        "express-fileupload": "^1.5.2",
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.8.1",
         "multer": "^1.4.5-lts.1",
         "multer-storage-cloudinary": "^4.0.0",
         "sharp": "^0.34.3",
-        "socket.io": "^4.8.1"
+        "socket.io": "^4.8.1",
+        "xlsx": "^0.18.5"
     },
     "devDependencies": {
         "nodemon": "^3.1.7"

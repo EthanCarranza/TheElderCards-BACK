@@ -2,7 +2,7 @@ const sharp = require("sharp");
 const { createCanvas, loadImage, GlobalFonts } = require("@napi-rs/canvas");
 const fs = require("fs");
 const path = require("path");
-const cloudinary = require("cloudinary").v2;
+const { uploadImageToCloudinary } = require("./cloudinaryHelper");
 
 const FONT_FAMILY = "Cyrodiil";
 const FONT_FILES = ["Cyrodiil.otf", "Cyrodiil-Bold.otf"];
@@ -35,18 +35,6 @@ if (!fontRegistered) {
   console.warn("Unable to register any Cyrodiil font variant.");
 }
 
-/**
- * Genera una carta vertical con marco de color, esquinas recortadas, imagen arriba, título-tipo, descripción y ataque/defensa si corresponde.
- * @param {string} inputImagePath - Ruta de la imagen subida
- * @param {string} title - Título de la carta
- * @param {string} type - Tipo de carta
- * @param {string} description - Descripción
- * @param {string} frameColor - Color del marco (ej: '#ff0000')
- * @param {string} creator - Nombre del creador que se mostrara en la carta.
- * @param {number} [attack] - Valor de ataque (solo si type es 'Creature')
- * @param {number} [defense] - Valor de defensa (solo si type es 'Creature')
- * @returns {Promise<string>} Ruta del archivo de salida
- */
 async function generateFramedImage(
   inputImagePath,
   title,
@@ -336,22 +324,16 @@ async function generateFramedImage(
   let cloudinaryUrl = null;
   try {
     const base64Image = `data:image/png;base64,${pngBuffer.toString("base64")}`;
-    const uploadResult = await cloudinary.uploader.upload(base64Image, {
+    cloudinaryUrl = await uploadImageToCloudinary(base64Image, {
       folder: "Cards",
       resource_type: "image",
     });
-    cloudinaryUrl = uploadResult.secure_url;
   } catch (error) {
-    console.error("Error subiendo a Cloudinary:", err);
-    throw err;
-  } finally {
-    try {
-      if (!inputIsRemote && typeof inputImagePath === "string") {
-        await fs.promises.unlink(inputImagePath);
-      }
-    } catch (unlinkErr) {
-      console.warn("No se pudo eliminar la imagen de entrada:", unlinkErr);
-    }
+    console.error(
+      `Error subiendo imagen ${pngBuffer.img} a Cloudinary:`,
+      error
+    );
+    throw error;
   }
   return cloudinaryUrl;
 }

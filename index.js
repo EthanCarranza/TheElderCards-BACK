@@ -10,6 +10,7 @@ const factionsRouter = require("./src/api/routes/factionRoute");
 const cardInteractionRouter = require("./src/api/routes/cardInteractionRoute");
 const friendshipRouter = require("./src/api/routes/friendshipRoute");
 const messageRouter = require("./src/api/routes/messageRoute");
+const bestiaryRouter = require("./src/api/routes/bestiaryRoute");
 
 const cloudinary = require("cloudinary").v2;
 const cors = require("cors");
@@ -44,6 +45,7 @@ app.use("/api/v1/factions", factionsRouter);
 app.use("/api/v1/card-interactions", cardInteractionRouter);
 app.use("/api/v1/friendships", friendshipRouter);
 app.use("/api/v1/messages", messageRouter);
+app.use("/api/v1/bestiary", bestiaryRouter);
 
 app.get("/", (req, res) => {
   res.json({
@@ -83,7 +85,6 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// Inicializar Socket.IO
 const io = initializeSocket(server);
 
 app.use("*", (req, res, next) => {
@@ -92,7 +93,6 @@ app.use("*", (req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📡 Socket.IO initialized`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`Server iniciado en el puerto ${PORT}`);
+  console.log(`Entorno: ${process.env.NODE_ENV || "development"}`);
 });

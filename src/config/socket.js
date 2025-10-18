@@ -45,7 +45,11 @@ const initializeSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
-    console.log(`✅ Usuario conectado: ${socket.user.username || socket.user.email} (${socket.userId})`);
+    console.log(
+      `Usuario conectado: ${socket.user.username || socket.user.email} (${
+        socket.userId
+      })`
+    );
 
     socket.join(`user_${socket.userId}`);
     socket.on("request_initial_counts", async () => {
@@ -71,11 +75,11 @@ const initializeSocket = (server) => {
     });
 
     socket.on("disconnect", (reason) => {
-      console.log(`❌ Usuario desconectado: ${socket.userId} (${reason})`);
+      console.log(`Usuario desconectado: ${socket.userId} (${reason})`);
     });
   });
 
-  console.log("✅ Socket.IO configurado correctamente");
+  console.log("Socket.IO configurado correctamente");
   return io;
 };
 

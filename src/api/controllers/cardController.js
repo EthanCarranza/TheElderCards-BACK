@@ -390,9 +390,7 @@ const createCard = async (req, res, next) => {
       }
 
       return res.status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR).json({
-        message: "Error al generar la imagen de la carta",
-        error: imageError.message,
-        details:
+        message:
           "La imagen no pudo ser procesada correctamente. Verifica que el formato sea válido e inténtalo de nuevo.",
       });
     }
@@ -433,14 +431,21 @@ const createCard = async (req, res, next) => {
     console.log("Intentando crear carta...");
 
     const savedCard = await Card.create(cardData);
-    console.log("Carta creada exitosamente:", savedCard._id);
+    console.log(
+      `Carta creada exitosamente: ${savedCard._id}, título: ${savedCard.title}`
+    );
 
     if (req.file && req.file.path) {
       try {
         await deleteImageFromCloudinary(req.file.path);
-        console.log("Imagen temporal eliminada de Cloudinary:", req.file.path);
-      } catch (cleanupError) {
-        console.warn("No se pudo eliminar la imagen temporal de Cloudinary:", cleanupError.message);
+        console.log(
+          `Imagen temporal eliminada de Cloudinary: ${req.file.path}`
+        );
+      } catch (error) {
+        console.error(
+          `No se pudo eliminar la imagen temporal ${req.file.path} de Cloudinary:`,
+          error.message
+        );
       }
     }
 
@@ -455,7 +460,7 @@ const createCard = async (req, res, next) => {
     console.error("Error al crear carta:", error);
     return res
       .status(HTTP_RESPONSES.INTERNAL_SERVER_ERROR)
-      .json({ message: "Error interno del servidor", error: error.message });
+      .json(HTTP_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -540,7 +545,6 @@ const deleteCard = async (req, res, next) => {
       await deleteImageFromCloudinary(card.img);
     }
 
-    // Eliminar la carta de la base de datos
     await Card.findByIdAndDelete(id);
 
     await Collection.updateMany({ cards: id }, { $pull: { cards: id } });

@@ -176,8 +176,7 @@ const getCollections = async (req, res, next) => {
           totalPages: Math.ceil(total / parseInt(limit)),
         });
       } else {
-        let field = sort.split("_")[0];
-        let direction = sort.split("_")[1];
+        let [field, direction] = sort.split("_");
         if (field === "date") field = "createdAt";
         sortObj[field] = direction === "desc" ? -1 : 1;
       }
@@ -557,10 +556,10 @@ const updateCollection = async (req, res, next) => {
       if (collection.img) {
         try {
           await deleteImageFromCloudinary(collection.img);
-        } catch (err) {
-          console.warn(
+        } catch (error) {
+          console.error(
             "No se pudo eliminar la imagen anterior de Cloudinary:",
-            err
+            error
           );
         }
       }
@@ -622,11 +621,9 @@ const deleteCollection = async (req, res, next) => {
     const isAdmin = req.user?.role === "admin";
     if (collection.isPrivate) {
       if (!isOwner) {
-        return res
-          .status(HTTP_RESPONSES.FORBIDDEN)
-          .json({
-            message: "No tienes permiso para eliminar esta colección privada",
-          });
+        return res.status(HTTP_RESPONSES.FORBIDDEN).json({
+          message: "No tienes permiso para eliminar esta colección privada",
+        });
       }
     } else {
       if (!isOwner && !isAdmin) {
@@ -639,8 +636,8 @@ const deleteCollection = async (req, res, next) => {
     if (collection.img) {
       try {
         await deleteImageFromCloudinary(collection.img);
-      } catch (err) {
-        console.warn("No se pudo eliminar la imagen de Cloudinary:", err);
+      } catch (error) {
+        console.error("No se pudo eliminar la imagen de Cloudinary:", error);
       }
     }
     await Collection.findByIdAndDelete(id);
